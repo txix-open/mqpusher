@@ -1,0 +1,25 @@
+source:
+  db:
+    database:
+      address: 127.0.0.1
+      schema: ""
+      database: ""
+      port: "5432"
+      username: user
+      password: password
+    query: "select * from all"
+    cursor: true
+#  csv:
+#    filename: "data.csv.gz"
+target:
+  rabbit:
+    address:
+      port: "5672"
+      ip: 127.0.0.1
+    user: user
+    password: password
+  publisher:
+    exchangename: test-queue
+    routingkey: test-queue
+#script:
+#  filename: "script.js"
