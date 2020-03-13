@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"compress/gzip"
-	"encoding/csv"
-	"io"
+	"fmt"
 	"os"
 	"sync/atomic"
 
@@ -11,40 +11,42 @@ import (
 	"go.uber.org/multierr"
 )
 
-type CsvDataSource struct {
-	cfg           CsvSource
+type JsonDataSource struct {
+	cfg           JsonSource
 	file          *os.File
 	gzipReader    *gzip.Reader
-	csvReader     *csv.Reader
-	columns       []string
 	readerCounter *ReaderCounter
+	scanner       *bufio.Scanner
 	fileSize      int64
 	processedRows int64
 }
 
-func (s *CsvDataSource) GetRow() (map[string]interface{}, error) {
-	row, err := s.csvReader.Read()
-	if err == io.EOF {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
+func (s *JsonDataSource) GetRow() (map[string]interface{}, error) {
+	ok := s.scanner.Scan()
+	if !ok {
+		if err := s.scanner.Err(); err != nil {
+			return nil, err
+		} else {
+			return nil, nil
+		}
 	}
-
-	result := make(map[string]interface{}, len(s.columns))
-	for i := range s.columns {
-		result[s.columns[i]] = row[i]
+	b := s.scanner.Bytes()
+	result := make(map[string]interface{})
+	err := json.Unmarshal(b, &result)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshaling row: %v", err)
 	}
 
 	atomic.AddInt64(&s.processedRows, 1)
 	return result, nil
 }
 
-func (s *CsvDataSource) Progress() (int64, float32) {
+func (s *JsonDataSource) Progress() (int64, float32) {
 	current := atomic.LoadInt64(&s.processedRows)
 	return current, float32(s.readerCounter.Count()) / float32(s.fileSize) * 100
 }
 
-func (s *CsvDataSource) Close() error {
+func (s *JsonDataSource) Close() error {
 	var err error
 	if s.gzipReader != nil {
 		err2 := s.gzipReader.Close()
@@ -62,7 +64,7 @@ func (s *CsvDataSource) Close() error {
 	return err
 }
 
-func NewCsvDataSource(cfg CsvSource) (DataSource, error) {
+func NewJsonDataSource(cfg JsonSource) (DataSource, error) {
 	file, gzipReader, readerCounter, err := makeReaders(cfg.Filename)
 	if err != nil {
 		return nil, err
@@ -71,24 +73,14 @@ func NewCsvDataSource(cfg CsvSource) (DataSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	csvReader := csv.NewReader(gzipReader)
-	csvReader.Comma = ';'
+	scanner := bufio.NewScanner(gzipReader)
 
-	csvReader.ReuseRecord = true
-	row, err := csvReader.Read()
-	if err != nil {
-		return nil, err
-	}
-	columns := make([]string, len(row))
-	copy(columns, row)
-
-	return &CsvDataSource{
+	return &JsonDataSource{
 		cfg:           cfg,
-		columns:       columns,
 		file:          file,
 		fileSize:      info.Size(),
 		readerCounter: readerCounter,
 		gzipReader:    gzipReader,
-		csvReader:     csvReader,
+		scanner:       scanner,
 	}, nil
 }

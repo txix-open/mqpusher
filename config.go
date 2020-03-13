@@ -13,10 +13,14 @@ type (
 	}
 
 	Source struct {
-		Csv *CsvSource
-		DB  *DBSource
+		Csv  *CsvSource
+		Json *JsonSource
+		DB   *DBSource
 	}
 	CsvSource struct {
+		Filename string `valid:"required~Required"`
+	}
+	JsonSource struct {
 		Filename string `valid:"required~Required"`
 	}
 	DBSource struct {

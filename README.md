@@ -2,6 +2,7 @@
 The mqpusher tool is designed to transfer data from various sources to a single RabbitMQ queue. 
 There is also option to execute js script on every data row before sending them to the queue. At the moment the following sources are supported:
 - csv file
+- json file (one json object per line)
 - sql queries for the postgresql database
 
 The configuration is defined through a configuration file, an example is `config.example.yaml`.
@@ -12,6 +13,8 @@ Some settings can be overridden via flags:
     config file path (default "config.yaml")
 -csv_file string
     .csv.gz source file path
+-json_file string
+    .json.gz source file path
 -script string
     script file path
 ```

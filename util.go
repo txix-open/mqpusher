@@ -1,8 +1,12 @@
 package main
 
 import (
+	"compress/gzip"
 	"io"
+	"os"
 	"sync/atomic"
+
+	"github.com/pkg/errors"
 )
 
 type ReaderCounter struct {
@@ -24,4 +28,20 @@ func NewReaderCounter(r io.Reader) *ReaderCounter {
 	return &ReaderCounter{
 		Reader: r,
 	}
+}
+
+func makeReaders(path string) (*os.File, *gzip.Reader, *ReaderCounter, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, nil, nil, errors.WithMessage(err, "open file")
+	}
+
+	readerCounter := NewReaderCounter(file)
+	gzipReader, err := gzip.NewReader(readerCounter)
+	if err != nil {
+		_ = file.Close()
+		return nil, nil, nil, errors.WithMessage(err, "open gzip reader")
+	}
+
+	return file, gzipReader, readerCounter, nil
 }

@@ -28,6 +28,7 @@ type DataSource interface {
 
 var (
 	csvFilepath    = ""
+	jsonFilepath   = ""
 	configFilepath = ""
 	scriptFilepath = ""
 )
@@ -37,6 +38,7 @@ var json = jsoniter.ConfigFastest
 func main() {
 	flag.StringVar(&configFilepath, "config", "config.yaml", "config file path")
 	flag.StringVar(&csvFilepath, "csv_file", "", ".csv.gz source file path")
+	flag.StringVar(&jsonFilepath, "json_file", "", ".json.gz source file path")
 	flag.StringVar(&scriptFilepath, "script", "", "script file path")
 	flag.CommandLine.SetOutput(os.Stdout)
 	flag.Parse()
@@ -56,6 +58,9 @@ func main() {
 
 	if csvFilepath != "" {
 		cfg.Source.Csv = &CsvSource{Filename: csvFilepath}
+	}
+	if jsonFilepath != "" {
+		cfg.Source.Json = &JsonSource{Filename: jsonFilepath}
 	}
 	if scriptFilepath != "" {
 		cfg.Script = Script{Filename: scriptFilepath}
@@ -135,6 +140,12 @@ func main() {
 		source, err = NewCsvDataSource(*cfg.Source.Csv)
 		if err != nil {
 			log.Errorf(0, "creating csv source: %v", err)
+			return
+		}
+	case cfg.Source.Json != nil:
+		source, err = NewJsonDataSource(*cfg.Source.Json)
+		if err != nil {
+			log.Errorf(0, "creating json source: %v", err)
 			return
 		}
 	case cfg.Source.DB != nil:
