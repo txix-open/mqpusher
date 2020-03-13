@@ -5,22 +5,21 @@ import (
 	"encoding/csv"
 	"io"
 	"os"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"go.uber.org/multierr"
 )
 
-type DataSource interface {
-	GetRow() (map[string]interface{}, error)
-	Close() error
-}
-
 type CsvDataSource struct {
-	cfg        CsvSource
-	file       *os.File
-	gzipReader *gzip.Reader
-	csvReader  *csv.Reader
-	columns    []string
+	cfg           CsvSource
+	file          *os.File
+	gzipReader    *gzip.Reader
+	csvReader     *csv.Reader
+	columns       []string
+	readerCounter *ReaderCounter
+	fileSize      int64
+	processedRows int64
 }
 
 func (s *CsvDataSource) GetRow() (map[string]interface{}, error) {
@@ -36,7 +35,13 @@ func (s *CsvDataSource) GetRow() (map[string]interface{}, error) {
 		result[s.columns[i]] = row[i]
 	}
 
+	atomic.AddInt64(&s.processedRows, 1)
 	return result, nil
+}
+
+func (s *CsvDataSource) Progress() (int64, float32) {
+	current := atomic.LoadInt64(&s.processedRows)
+	return current, float32(s.readerCounter.Count()) / float32(s.fileSize) * 100
 }
 
 func (s *CsvDataSource) Close() error {
@@ -58,10 +63,16 @@ func (s *CsvDataSource) Close() error {
 }
 
 func NewCsvDataSource(cfg CsvSource) (DataSource, error) {
-	file, gzipReader, csvReader, err := makeReaders(cfg.Filename, ';')
+	file, gzipReader, readerCounter, err := makeReaders(cfg.Filename)
 	if err != nil {
 		return nil, err
 	}
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	csvReader := csv.NewReader(gzipReader)
+	csvReader.Comma = ';'
 
 	csvReader.ReuseRecord = true
 	row, err := csvReader.Read()
@@ -72,28 +83,28 @@ func NewCsvDataSource(cfg CsvSource) (DataSource, error) {
 	copy(columns, row)
 
 	return &CsvDataSource{
-		cfg:        cfg,
-		columns:    columns,
-		file:       file,
-		gzipReader: gzipReader,
-		csvReader:  csvReader,
+		cfg:           cfg,
+		columns:       columns,
+		file:          file,
+		fileSize:      info.Size(),
+		readerCounter: readerCounter,
+		gzipReader:    gzipReader,
+		csvReader:     csvReader,
 	}, nil
 }
 
-func makeReaders(path string, csvSep rune) (*os.File, *gzip.Reader, *csv.Reader, error) {
+func makeReaders(path string) (*os.File, *gzip.Reader, *ReaderCounter, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, nil, nil, errors.WithMessage(err, "open file")
 	}
 
-	gzipReader, err := gzip.NewReader(file)
+	readerCounter := NewReaderCounter(file)
+	gzipReader, err := gzip.NewReader(readerCounter)
 	if err != nil {
 		_ = file.Close()
 		return nil, nil, nil, errors.WithMessage(err, "open gzip reader")
 	}
 
-	csvReader := csv.NewReader(gzipReader)
-	csvReader.Comma = csvSep
-
-	return file, gzipReader, csvReader, nil
+	return file, gzipReader, readerCounter, nil
 }

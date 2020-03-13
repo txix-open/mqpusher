@@ -5,7 +5,6 @@ import (
 	"flag"
 	"io/ioutil"
 	"os"
-	"sync/atomic"
 	"time"
 
 	"github.com/asaskevich/govalidator"
@@ -21,6 +20,12 @@ const (
 	publisherName = "publisher_name"
 )
 
+type DataSource interface {
+	GetRow() (map[string]interface{}, error)
+	Progress() (int64, float32)
+	Close() error
+}
+
 var (
 	csvFilepath    = ""
 	configFilepath = ""
@@ -31,7 +36,7 @@ var json = jsoniter.ConfigFastest
 
 func main() {
 	flag.StringVar(&configFilepath, "config", "config.yaml", "config file path")
-	flag.StringVar(&csvFilepath, "csv_file", "", "csv.gz source file path")
+	flag.StringVar(&csvFilepath, "csv_file", "", ".csv.gz source file path")
 	flag.StringVar(&scriptFilepath, "script", "", "script file path")
 	flag.CommandLine.SetOutput(os.Stdout)
 	flag.Parse()
@@ -71,7 +76,7 @@ func main() {
 		mq.WithPublishers(publishers),
 	)
 	defer mqClient.Close()
-	time.Sleep(50 * time.Millisecond) // REMOVE: wait for publisher initialization
+	time.Sleep(100 * time.Millisecond) // REMOVE: wait for publisher initialization
 
 	publish := func(v interface{}) error {
 		body, err := json.Marshal(v)
@@ -143,19 +148,19 @@ func main() {
 		return
 	}
 
-	var totalCount uint64 = 0
 	started := time.Now()
 	defer func() {
+		totalCount, _ := source.Progress()
 		log.Infof(0, "total processed rows %d, elapsed time: %s", totalCount, time.Since(started).String())
 	}()
 
 	go func() {
 		const printProgressInterval = 30 * time.Second
-		var count uint64
+		var count int64
 		for range time.NewTicker(printProgressInterval).C {
-			newTotal := atomic.LoadUint64(&totalCount)
+			newTotal, percent := source.Progress()
 			diff := newTotal - count
-			log.Infof(0, "processed %d rows in %s", diff, printProgressInterval)
+			log.Infof(0, "processed %d rows in %s; approximately %0.2f%% done", diff, printProgressInterval, percent)
 			count = newTotal
 		}
 	}()
@@ -182,7 +187,6 @@ func main() {
 			log.Errorf(0, "error publishing row: %v", err)
 			return
 		}
-		totalCount++
 	}
 
 	log.Info(0, "successfully finished")

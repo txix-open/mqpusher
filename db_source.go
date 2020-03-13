@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/integration-system/isp-lib/v2/structure"
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -13,11 +14,25 @@ const (
 	batchSize  = 5000
 )
 
+const countRowsFunc = `
+DO $$
+    DECLARE
+        plan jsonb;
+    BEGIN
+        EXECUTE 'EXPLAIN (FORMAT JSON) %s' INTO plan;
+        CREATE TEMPORARY TABLE __table ON COMMIT DROP AS SELECT (plan -> 0 -> 'Plan' ->> 'Plan Rows')::bigint;
+    END
+$$;
+`
+const countRowsQuery = "SELECT * from __table;"
+
 type DbDataSource struct {
-	cfg    DBSource
-	errCh  chan error
-	rowsCh chan map[string]interface{}
-	db     *sqlx.DB
+	cfg           DBSource
+	errCh         chan error
+	rowsCh        chan map[string]interface{}
+	db            *sqlx.DB
+	totalRows     int64
+	processedRows int64
 }
 
 func (s *DbDataSource) GetRow() (map[string]interface{}, error) {
@@ -28,8 +43,14 @@ func (s *DbDataSource) GetRow() (map[string]interface{}, error) {
 		if !open {
 			return nil, nil
 		}
+		atomic.AddInt64(&s.processedRows, 1)
 		return row, nil
 	}
+}
+
+func (s *DbDataSource) Progress() (int64, float32) {
+	current := atomic.LoadInt64(&s.processedRows)
+	return current, float32(current) / float32(s.totalRows) * 100
 }
 
 func (s *DbDataSource) Close() error {
@@ -135,16 +156,21 @@ func (s *DbDataSource) fetchDataCursor() {
 
 func NewDbDataSource(cfg DBSource) (DataSource, error) {
 	db, err := sqlx.Connect("pgx", sqlConnString(cfg.Database))
+	if err != nil {
+		return nil, err
+	}
 
+	totalRows, err := EstimateQueryTotalRows(db, cfg.Query)
 	if err != nil {
 		return nil, err
 	}
 
 	ds := &DbDataSource{
-		cfg:    cfg,
-		db:     db,
-		rowsCh: make(chan map[string]interface{}),
-		errCh:  make(chan error),
+		cfg:       cfg,
+		db:        db,
+		totalRows: totalRows,
+		rowsCh:    make(chan map[string]interface{}),
+		errCh:     make(chan error),
 	}
 
 	if ds.cfg.Cursor {
@@ -168,4 +194,27 @@ func sqlConnString(config structure.DBConfiguration) string {
 	)
 
 	return cs
+}
+
+func EstimateQueryTotalRows(db *sqlx.DB, query string) (int64, error) {
+	tx, err := db.Beginx()
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		_ = tx.Commit()
+	}()
+
+	_, err = tx.Exec(fmt.Sprintf(countRowsFunc, query))
+	if err != nil {
+		return 0, err
+	}
+
+	row := tx.QueryRowx(countRowsQuery)
+	var count int64
+	err = row.Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }
