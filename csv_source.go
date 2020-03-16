@@ -22,7 +22,7 @@ type CsvDataSource struct {
 	processedRows int64
 }
 
-func (s *CsvDataSource) GetRow() (map[string]interface{}, error) {
+func (s *CsvDataSource) GetData() (interface{}, error) {
 	row, err := s.csvReader.Read()
 	if err == io.EOF {
 		return nil, nil
@@ -30,13 +30,13 @@ func (s *CsvDataSource) GetRow() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	result := make(map[string]interface{}, len(s.columns))
+	data := make(map[string]interface{}, len(s.columns))
 	for i := range s.columns {
-		result[s.columns[i]] = row[i]
+		data[s.columns[i]] = row[i]
 	}
 
 	atomic.AddInt64(&s.processedRows, 1)
-	return result, nil
+	return data, nil
 }
 
 func (s *CsvDataSource) Progress() (int64, float32) {

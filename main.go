@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"io/ioutil"
 	"os"
@@ -21,7 +20,7 @@ const (
 )
 
 type DataSource interface {
-	GetRow() (map[string]interface{}, error)
+	GetData() (interface{}, error)
 	Progress() (int64, float32)
 	Close() error
 }
@@ -97,7 +96,7 @@ func main() {
 	}
 
 	// Script
-	var convert func(map[string]interface{}) (map[string]interface{}, error)
+	var convert func(interface{}) (interface{}, error)
 
 	if cfg.Script.Filename != "" {
 		b, err := ioutil.ReadFile(cfg.Script.Filename)
@@ -110,16 +109,12 @@ func main() {
 			log.Errorf(0, "parsing script: %v", err)
 			return
 		}
-		convert = func(m map[string]interface{}) (map[string]interface{}, error) {
-			val, err := script.Default().Execute(scr, m)
+		convert = func(data interface{}) (interface{}, error) {
+			val, err := script.Default().Execute(scr, data)
 			if err != nil {
 				return nil, err
 			}
-			res, ok := val.(map[string]interface{})
-			if !ok {
-				return nil, errors.New("invalid conversion from script value to map")
-			}
-			return res, nil
+			return val, nil
 		}
 	}
 
@@ -177,7 +172,7 @@ func main() {
 	}()
 
 	for {
-		row, err := source.GetRow()
+		row, err := source.GetData()
 		if err != nil {
 			log.Errorf(0, "error reading row: %v", err)
 			return

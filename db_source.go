@@ -35,7 +35,7 @@ type DbDataSource struct {
 	processedRows int64
 }
 
-func (s *DbDataSource) GetRow() (map[string]interface{}, error) {
+func (s *DbDataSource) GetData() (interface{}, error) {
 	select {
 	case err := <-s.errCh:
 		return nil, err

@@ -25,7 +25,7 @@ type JsonDataSource struct {
 	processedRows int64
 }
 
-func (s *JsonDataSource) GetRow() (map[string]interface{}, error) {
+func (s *JsonDataSource) GetData() (interface{}, error) {
 	ok := s.scanner.Scan()
 	if !ok {
 		if err := s.scanner.Err(); err != nil {
@@ -35,14 +35,14 @@ func (s *JsonDataSource) GetRow() (map[string]interface{}, error) {
 		}
 	}
 	b := s.scanner.Bytes()
-	result := make(map[string]interface{})
-	err := json.Unmarshal(b, &result)
+	var data interface{}
+	err := json.Unmarshal(b, &data)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshaling row: %v", err)
 	}
 
 	atomic.AddInt64(&s.processedRows, 1)
-	return result, nil
+	return data, nil
 }
 
 func (s *JsonDataSource) Progress() (int64, float32) {
