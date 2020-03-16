@@ -11,6 +11,10 @@ import (
 	"go.uber.org/multierr"
 )
 
+const (
+	maxScannerBuf = 1 << 20 // 1 MB
+)
+
 type JsonDataSource struct {
 	cfg           JsonSource
 	file          *os.File
@@ -74,6 +78,7 @@ func NewJsonDataSource(cfg JsonSource) (DataSource, error) {
 		return nil, err
 	}
 	scanner := bufio.NewScanner(gzipReader)
+	scanner.Buffer(make([]byte, maxScannerBuf), maxScannerBuf)
 
 	return &JsonDataSource{
 		cfg:           cfg,
