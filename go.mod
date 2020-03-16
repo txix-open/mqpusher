@@ -13,7 +13,6 @@ require (
 	github.com/jackc/pgx/v4 v4.5.0
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/json-iterator/go v1.1.9
-	github.com/pkg/errors v0.9.1
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	go.uber.org/multierr v1.1.0
 	gopkg.in/yaml.v2 v2.2.4

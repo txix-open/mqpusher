@@ -36,8 +36,8 @@ var json = jsoniter.ConfigFastest
 
 func main() {
 	flag.StringVar(&configFilepath, "config", "config.yaml", "config file path")
-	flag.StringVar(&csvFilepath, "csv_file", "", ".csv.gz source file path")
-	flag.StringVar(&jsonFilepath, "json_file", "", ".json.gz source file path")
+	flag.StringVar(&csvFilepath, "csv_file", "", "csv source file path")
+	flag.StringVar(&jsonFilepath, "json_file", "", "json source file path")
 	flag.StringVar(&scriptFilepath, "script", "", "script file path")
 	flag.CommandLine.SetOutput(os.Stdout)
 	flag.Parse()
