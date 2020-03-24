@@ -13,13 +13,18 @@ import (
 	"go.uber.org/multierr"
 )
 
-type ReaderCounter struct {
+type BaseReader interface {
+	io.ReaderAt
 	io.Reader
+}
+
+type ReaderCounter struct {
+	BaseReader
 	count int64
 }
 
 func (rc *ReaderCounter) Read(buf []byte) (int, error) {
-	n, err := rc.Reader.Read(buf)
+	n, err := rc.BaseReader.Read(buf)
 	atomic.AddInt64(&rc.count, int64(n))
 	return n, err
 }
@@ -28,9 +33,9 @@ func (rc *ReaderCounter) Count() int64 {
 	return atomic.LoadInt64(&rc.count)
 }
 
-func NewReaderCounter(r io.Reader) *ReaderCounter {
+func NewReaderCounter(r BaseReader) *ReaderCounter {
 	return &ReaderCounter{
-		Reader: r,
+		BaseReader: r,
 	}
 }
 
@@ -51,7 +56,7 @@ func makeReaders(path string) (os.FileInfo, io.Reader, *ReaderCounter, func() er
 	mimeType := mime.TypeByExtension(filepath.Ext(path))
 	switch mimeType {
 	case "application/zip":
-		reader, err := zip.NewReader(file, info.Size())
+		reader, err := zip.NewReader(readerCounter, info.Size())
 		if err != nil {
 			_ = file.Close()
 			return nil, nil, nil, nil, fmt.Errorf("open zip reader: %v", err)
