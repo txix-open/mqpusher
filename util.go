@@ -15,7 +15,7 @@ import (
 
 type BaseReader interface {
 	io.ReaderAt
-	io.Reader
+	io.ReadCloser
 }
 
 type ReaderCounter struct {
@@ -98,7 +98,7 @@ func makeReaders(path string) (os.FileInfo, io.Reader, *ReaderCounter, func() er
 		return err
 	}
 
-	var reader io.ReadCloser = file
+	var reader io.ReadCloser = readerCounter
 	if compressedReader != nil {
 		reader = compressedReader
 	}
