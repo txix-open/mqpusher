@@ -49,6 +49,7 @@ func initVm() *goja.Runtime {
 
 	vm.Set("sha256", Sha256)
 	vm.Set("sha512", Sha512)
+	vm.Set("formatDate", FormatDate)
 
 	return vm
 }
@@ -119,6 +120,10 @@ func Sha512(value string) string {
 	_, _ = hash.Write([]byte(strings.ToLower(value)))
 	bytes := hash.Sum(nil)
 	return fmt.Sprintf("%x", bytes)
+}
+
+func FormatDate(t time.Time, format string) string {
+	return t.Format(format)
 }
 
 type jsonFieldNameMapper struct{}
