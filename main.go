@@ -80,7 +80,7 @@ func main() {
 		mq.WithPublishers(publishers),
 	)
 	defer mqClient.Close()
-	time.Sleep(100 * time.Millisecond) // REMOVE: wait for publisher initialization
+	time.Sleep(500 * time.Millisecond) // REMOVE: wait for publisher initialization
 
 	publish := func(v interface{}) error {
 		body, err := json.Marshal(v)
