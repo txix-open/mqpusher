@@ -27,6 +27,7 @@ type (
 		Database structure.DBConfiguration `valid:"required~Required"`
 		Query    string                    `valid:"required~Required"`
 		Cursor   bool
+		Parallel int
 	}
 
 	Target struct {

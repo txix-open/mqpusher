@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/integration-system/isp-lib/v2/structure"
@@ -31,6 +32,8 @@ type DbDataSource struct {
 	cfg           DBSource
 	errCh         chan error
 	rowsCh        chan map[string]interface{}
+	ctx           context.Context
+	cancel        func()
 	db            *pgxpool.Pool
 	totalRows     int64
 	processedRows int64
@@ -39,6 +42,7 @@ type DbDataSource struct {
 func (s *DbDataSource) GetData() (interface{}, error) {
 	select {
 	case err := <-s.errCh:
+		s.cancel()
 		return nil, err
 	case row, open := <-s.rowsCh:
 		if !open {
@@ -61,27 +65,26 @@ func (s *DbDataSource) Close() error {
 
 func (s *DbDataSource) fetchData() {
 	err := func() (err error) {
-		ctx := context.Background()
-		conn, err := s.db.Acquire(ctx)
+		conn, err := s.db.Acquire(s.ctx)
 		if err != nil {
 			return err
 		}
 		defer conn.Release()
 		RegisterTypes(conn.Conn().ConnInfo())
 
-		tx, err := conn.Begin(ctx)
+		tx, err := conn.Begin(s.ctx)
 		if err != nil {
 			return err
 		}
 		defer func() {
 			if err != nil {
-				_ = tx.Rollback(ctx)
+				_ = tx.Rollback(s.ctx)
 			} else {
-				_ = tx.Commit(ctx)
+				_ = tx.Commit(s.ctx)
 			}
 		}()
 
-		rows, err := tx.Query(ctx, s.cfg.Query)
+		rows, err := tx.Query(s.ctx, s.cfg.Query)
 		if err != nil {
 			return err
 		}
@@ -122,35 +125,41 @@ func (s *DbDataSource) fetchData() {
 	close(s.rowsCh)
 }
 
-func (s *DbDataSource) fetchDataCursor() {
+func (s *DbDataSource) fetchDataCursor(total, number int) {
 	err := func() (err error) {
-		ctx := context.Background()
-		conn, err := s.db.Acquire(ctx)
+		conn, err := s.db.Acquire(s.ctx)
 		if err != nil {
 			return err
 		}
 		defer conn.Release()
 		RegisterTypes(conn.Conn().ConnInfo())
 
-		tx, err := conn.Begin(ctx)
+		tx, err := conn.Begin(s.ctx)
 		if err != nil {
 			return err
 		}
 		defer func() {
 			if err != nil {
-				_ = tx.Rollback(ctx)
+				_ = tx.Rollback(s.ctx)
 			} else {
-				_ = tx.Commit(ctx)
+				_ = tx.Commit(s.ctx)
 			}
 		}()
 
-		_, err = tx.Exec(ctx, fmt.Sprintf("DECLARE %s CURSOR FOR %s", cursorName, s.cfg.Query))
+		query := s.cfg.Query
+		cursorNameN := fmt.Sprintf("%s_%d", cursorName, number)
+		if total > 1 {
+			// TODO: учитывать структуру query, чтобы не получались невалидные запросы
+			query = fmt.Sprintf("%s WHERE MOD(id, %d) = %d", query, total, number)
+		}
+
+		_, err = tx.Exec(s.ctx, fmt.Sprintf("DECLARE %s CURSOR FOR %s", cursorNameN, query))
 		if err != nil {
 			return err
 		}
 
 		for {
-			rows, err := tx.Query(ctx, fmt.Sprintf("FETCH %d FROM %s", batchSize, cursorName))
+			rows, err := tx.Query(s.ctx, fmt.Sprintf("FETCH %d FROM %s", batchSize, cursorNameN))
 			if err != nil {
 				return err
 			}
@@ -191,8 +200,36 @@ func (s *DbDataSource) fetchDataCursor() {
 	}()
 
 	if err != nil {
-		s.errCh <- err
+		select {
+		case s.errCh <- err:
+		default:
+
+		}
 	}
+}
+
+func (s *DbDataSource) startFetching() {
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	if s.cfg.Parallel <= 1 {
+		if s.cfg.Cursor {
+			s.fetchDataCursor(0, 0)
+			close(s.rowsCh)
+		} else {
+			s.fetchData()
+		}
+
+		return
+	}
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < s.cfg.Parallel; i++ {
+		wg.Add(1)
+		go func(number int) {
+			defer wg.Done()
+			s.fetchDataCursor(s.cfg.Parallel, number)
+		}(i)
+	}
+	wg.Wait()
 	close(s.rowsCh)
 }
 
@@ -211,15 +248,10 @@ func NewDbDataSource(cfg DBSource) (DataSource, error) {
 		cfg:       cfg,
 		db:        db,
 		totalRows: totalRows,
-		rowsCh:    make(chan map[string]interface{}),
-		errCh:     make(chan error),
+		rowsCh:    make(chan map[string]interface{}, 3000), // TODO cap
+		errCh:     make(chan error, 1),
 	}
-
-	if ds.cfg.Cursor {
-		go ds.fetchDataCursor()
-	} else {
-		go ds.fetchData()
-	}
+	go ds.startFetching()
 
 	return ds, nil
 }

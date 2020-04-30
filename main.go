@@ -4,6 +4,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/asaskevich/govalidator"
@@ -35,6 +36,7 @@ var (
 var json = jsoniter.ConfigFastest
 
 func main() {
+	debug.SetGCPercent(1500)
 	flag.StringVar(&configFilepath, "config", "/etc/mqpusher/config.yml", "config file path")
 	flag.StringVar(&csvFilepath, "csv_file", "", "csv source file path")
 	flag.StringVar(&jsonFilepath, "json_file", "", "json source file path")
@@ -81,19 +83,6 @@ func main() {
 	)
 	defer mqClient.Close()
 	time.Sleep(500 * time.Millisecond) // REMOVE: wait for publisher initialization
-
-	publish := func(v interface{}) error {
-		body, err := json.Marshal(v)
-		if err != nil {
-			return err
-		}
-
-		return mqClient.GetPublisher(publisherName).Publish(amqp.Publishing{
-			ContentType:  "application/json",
-			Body:         body,
-			DeliveryMode: amqp.Persistent,
-		})
-	}
 
 	// Script
 	var convert func(interface{}) (interface{}, error)
@@ -160,6 +149,9 @@ func main() {
 		log.Infof(0, "total processed rows %d, elapsed time: %s", totalCount, time.Since(started).String())
 	}()
 
+	convertCh := make(chan interface{}, 3000) // TODO cap
+	publishCh := make(chan []byte, 3000)      // TODO cap
+
 	go func() {
 		const printProgressInterval = 30 * time.Second
 		var count int64
@@ -171,24 +163,52 @@ func main() {
 		}
 	}()
 
-	for {
-		row, err := source.GetData()
-		if err != nil {
-			log.Errorf(0, "error reading row: %v", err)
-			return
-		} else if row == nil {
-			break
-		}
+	go func() {
+		defer func() {
+			close(convertCh)
+		}()
 
-		if convert != nil {
-			row, err = convert(row)
+		for {
+			row, err := source.GetData()
 			if err != nil {
-				log.Errorf(0, "error executing script: %v", err)
+				log.Errorf(0, "error reading row: %v", err)
+				return
+			} else if row == nil {
 				return
 			}
+			convertCh <- row
 		}
+	}()
 
-		err = publish(row)
+	go func() {
+		defer func() {
+			close(publishCh)
+		}()
+
+		for row := range convertCh {
+			if convert != nil {
+				row, err = convert(row)
+				if err != nil {
+					log.Errorf(0, "error executing script: %v", err)
+					return
+				}
+			}
+
+			data, err := json.Marshal(row)
+			if err != nil {
+				log.Errorf(0, "error marshaling row: %v", err)
+				return
+			}
+			publishCh <- data
+		}
+	}()
+
+	for data := range publishCh {
+		err := mqClient.GetPublisher(publisherName).Publish(amqp.Publishing{
+			ContentType:  "application/json",
+			Body:         data,
+			DeliveryMode: amqp.Persistent,
+		})
 		if err != nil {
 			log.Errorf(0, "error publishing row: %v", err)
 			return
