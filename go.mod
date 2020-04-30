@@ -10,8 +10,8 @@ require (
 	github.com/integration-system/isp-event-lib v1.3.0
 	github.com/integration-system/isp-lib/v2 v2.2.0
 	github.com/integration-system/isp-log v1.0.0
-	github.com/jackc/pgx/v4 v4.5.0
-	github.com/jmoiron/sqlx v1.2.0
+	github.com/jackc/pgx/v4 v4.6.0
+	github.com/jmoiron/sqlx v1.2.1-0.20200324155115-ee514944af4b
 	github.com/json-iterator/go v1.1.9
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	go.uber.org/multierr v1.1.0

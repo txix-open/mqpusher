@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"sync/atomic"
 
@@ -77,8 +78,7 @@ func (s *DbDataSource) fetchData() {
 		}
 
 		for rows.Next() {
-			row := make(map[string]interface{})
-			err = rows.MapScan(row)
+			row, err := MapScan(rows)
 			if err != nil {
 				return err
 			}
@@ -127,8 +127,7 @@ func (s *DbDataSource) fetchDataCursor() {
 
 			count := 0
 			for rows.Next() {
-				row := make(map[string]interface{})
-				err = rows.MapScan(row)
+				row, err := MapScan(rows)
 				if err != nil {
 					return err
 				}
@@ -217,4 +216,47 @@ func EstimateQueryTotalRows(db *sqlx.DB, query string) (int64, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+func MapScan(rows *sqlx.Rows) (map[string]interface{}, error) {
+	columns, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+
+	dest := make(map[string]interface{}, len(columns))
+
+	values := make([]interface{}, len(columns))
+	for i := range values {
+		if columns[i].DatabaseTypeName() == "JSONB" {
+			values[i] = new(sql.RawBytes)
+		} else {
+			values[i] = new(interface{})
+		}
+	}
+
+	err = rows.Scan(values...)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, column := range columns {
+		if column.DatabaseTypeName() == "JSONB" {
+			rawVal := values[i].(*sql.RawBytes)
+			if rawVal == nil {
+				dest[column.Name()] = nil
+				continue
+			}
+			var val interface{}
+			err = json.Unmarshal(*rawVal, &val)
+			if err != nil {
+				return nil, err
+			}
+			dest[column.Name()] = val
+		} else {
+			dest[column.Name()] = *(values[i].(*interface{}))
+		}
+	}
+
+	return dest, rows.Err()
 }
