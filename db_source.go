@@ -1,13 +1,13 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"sync/atomic"
 
 	"github.com/integration-system/isp-lib/v2/structure"
+	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/jmoiron/sqlx"
 )
 
 const (
@@ -31,7 +31,7 @@ type DbDataSource struct {
 	cfg           DBSource
 	errCh         chan error
 	rowsCh        chan map[string]interface{}
-	db            *sqlx.DB
+	db            *pgxpool.Pool
 	totalRows     int64
 	processedRows int64
 }
@@ -55,32 +55,54 @@ func (s *DbDataSource) Progress() (int64, float32) {
 }
 
 func (s *DbDataSource) Close() error {
-	return s.db.Close()
+	s.db.Close()
+	return nil
 }
 
 func (s *DbDataSource) fetchData() {
 	err := func() (err error) {
-		tx, err := s.db.Beginx()
+		ctx := context.Background()
+		conn, err := s.db.Acquire(ctx)
+		if err != nil {
+			return err
+		}
+		defer conn.Release()
+		RegisterTypes(conn.Conn().ConnInfo())
+
+		tx, err := conn.Begin(ctx)
 		if err != nil {
 			return err
 		}
 		defer func() {
 			if err != nil {
-				_ = tx.Rollback()
+				_ = tx.Rollback(ctx)
 			} else {
-				_ = tx.Commit()
+				_ = tx.Commit(ctx)
 			}
 		}()
 
-		rows, err := tx.Queryx(s.cfg.Query)
+		rows, err := tx.Query(ctx, s.cfg.Query)
 		if err != nil {
 			return err
 		}
 
+		var columns []string
 		for rows.Next() {
-			row, err := MapScan(rows)
+			vals, err := rows.Values()
+			if columns == nil {
+				fieldDescriptions := rows.FieldDescriptions()
+				columns = make([]string, len(fieldDescriptions))
+				for i := range fieldDescriptions {
+					columns[i] = string(fieldDescriptions[i].Name)
+				}
+			}
+
 			if err != nil {
 				return err
+			}
+			row := make(map[string]interface{}, len(vals))
+			for i := range columns {
+				row[columns[i]] = vals[i]
 			}
 
 			s.rowsCh <- row
@@ -102,34 +124,55 @@ func (s *DbDataSource) fetchData() {
 
 func (s *DbDataSource) fetchDataCursor() {
 	err := func() (err error) {
-		tx, err := s.db.Beginx()
+		ctx := context.Background()
+		conn, err := s.db.Acquire(ctx)
+		if err != nil {
+			return err
+		}
+		defer conn.Release()
+		RegisterTypes(conn.Conn().ConnInfo())
+
+		tx, err := conn.Begin(ctx)
 		if err != nil {
 			return err
 		}
 		defer func() {
 			if err != nil {
-				_ = tx.Rollback()
+				_ = tx.Rollback(ctx)
 			} else {
-				_ = tx.Commit()
+				_ = tx.Commit(ctx)
 			}
 		}()
 
-		_, err = tx.Exec(fmt.Sprintf("DECLARE %s CURSOR FOR %s", cursorName, s.cfg.Query))
+		_, err = tx.Exec(ctx, fmt.Sprintf("DECLARE %s CURSOR FOR %s", cursorName, s.cfg.Query))
 		if err != nil {
 			return err
 		}
 
 		for {
-			rows, err := tx.Queryx(fmt.Sprintf("FETCH %d FROM %s", batchSize, cursorName))
+			rows, err := tx.Query(ctx, fmt.Sprintf("FETCH %d FROM %s", batchSize, cursorName))
 			if err != nil {
 				return err
 			}
 
+			var columns []string
 			count := 0
 			for rows.Next() {
-				row, err := MapScan(rows)
+				vals, err := rows.Values()
+				if columns == nil {
+					fieldDescriptions := rows.FieldDescriptions()
+					columns = make([]string, len(fieldDescriptions))
+					for i := range fieldDescriptions {
+						columns[i] = string(fieldDescriptions[i].Name)
+					}
+				}
+
 				if err != nil {
 					return err
+				}
+				row := make(map[string]interface{}, len(vals))
+				for i := range columns {
+					row[columns[i]] = vals[i]
 				}
 
 				s.rowsCh <- row
@@ -154,7 +197,7 @@ func (s *DbDataSource) fetchDataCursor() {
 }
 
 func NewDbDataSource(cfg DBSource) (DataSource, error) {
-	db, err := sqlx.Connect("pgx", sqlConnString(cfg.Database))
+	db, err := pgxpool.Connect(context.Background(), sqlConnString(cfg.Database))
 	if err != nil {
 		return nil, err
 	}
@@ -195,68 +238,26 @@ func sqlConnString(config structure.DBConfiguration) string {
 	return cs
 }
 
-func EstimateQueryTotalRows(db *sqlx.DB, query string) (int64, error) {
-	tx, err := db.Beginx()
+func EstimateQueryTotalRows(db *pgxpool.Pool, query string) (int64, error) {
+	ctx := context.Background()
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return 0, err
 	}
 	defer func() {
-		_ = tx.Commit()
+		_ = tx.Commit(ctx)
 	}()
 
-	_, err = tx.Exec(fmt.Sprintf(countRowsFunc, query))
+	_, err = tx.Exec(ctx, fmt.Sprintf(countRowsFunc, query))
 	if err != nil {
 		return 0, err
 	}
 
-	row := tx.QueryRowx(countRowsQuery)
+	row := tx.QueryRow(ctx, countRowsQuery)
 	var count int64
 	err = row.Scan(&count)
 	if err != nil {
 		return 0, err
 	}
 	return count, nil
-}
-
-func MapScan(rows *sqlx.Rows) (map[string]interface{}, error) {
-	columns, err := rows.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
-
-	dest := make(map[string]interface{}, len(columns))
-
-	values := make([]interface{}, len(columns))
-	for i := range values {
-		if columns[i].DatabaseTypeName() == "JSONB" {
-			values[i] = new(sql.RawBytes)
-		} else {
-			values[i] = new(interface{})
-		}
-	}
-
-	err = rows.Scan(values...)
-	if err != nil {
-		return nil, err
-	}
-
-	for i, column := range columns {
-		if column.DatabaseTypeName() == "JSONB" {
-			rawVal := values[i].(*sql.RawBytes)
-			if rawVal == nil {
-				dest[column.Name()] = nil
-				continue
-			}
-			var val interface{}
-			err = json.Unmarshal(*rawVal, &val)
-			if err != nil {
-				return nil, err
-			}
-			dest[column.Name()] = val
-		} else {
-			dest[column.Name()] = *(values[i].(*interface{}))
-		}
-	}
-
-	return dest, rows.Err()
 }
