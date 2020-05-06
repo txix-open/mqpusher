@@ -213,7 +213,7 @@ func main() {
 		p, err := ants.NewPoolWithFunc(batchSize, func(arg interface{}) {
 			defer wg.Done()
 			syncSubmit(arg)
-		}, ants.WithPreAlloc(true), ants.WithNonblocking(true))
+		}, ants.WithPreAlloc(true))
 		if err != nil {
 			panic(err)
 		}
