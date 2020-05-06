@@ -28,7 +28,7 @@ type (
 		Query              string
 		Cursor             bool
 		Parallel           int
-		ConcurrentDBSource *ConcurrentDBSource
+		ConcurrentDBSource *ConcurrentDBSource `yaml:"concurrent"`
 	}
 
 	ConcurrentDBSource struct {
