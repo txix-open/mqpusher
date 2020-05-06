@@ -21,5 +21,6 @@ target:
   publisher:
     exchangename: test-queue
     routingkey: test-queue
+  async: true
 #script:
 #  filename: "script.js"

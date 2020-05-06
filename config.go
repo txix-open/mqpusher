@@ -24,15 +24,24 @@ type (
 		Filename string `valid:"required~Required"`
 	}
 	DBSource struct {
-		Database structure.DBConfiguration `valid:"required~Required"`
-		Query    string                    `valid:"required~Required"`
-		Cursor   bool
-		Parallel int
+		Database           structure.DBConfiguration `valid:"required~Required"`
+		Query              string
+		Cursor             bool
+		Parallel           int
+		ConcurrentDBSource *ConcurrentDBSource
+	}
+
+	ConcurrentDBSource struct {
+		Table    string `valid:"required~Required"`
+		Select   string
+		IdColumn string
+		Where    string
 	}
 
 	Target struct {
 		Rabbit    structure.RabbitConfig `valid:"required~Required"`
 		Publisher mq.PublisherCfg        `valid:"required~Required"`
+		Async     bool
 	}
 	Script struct {
 		Filename string

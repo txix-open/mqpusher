@@ -13,8 +13,11 @@ require (
 	github.com/jackc/pgtype v1.3.0
 	github.com/jackc/pgx/v4 v4.6.0
 	github.com/json-iterator/go v1.1.9
+	github.com/panjf2000/ants/v2 v2.3.1
+	github.com/pkg/errors v0.9.1
+	github.com/spf13/cast v1.3.0
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	go.uber.org/multierr v1.1.0
 	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
-	gopkg.in/yaml.v2 v2.2.4
+	gopkg.in/yaml.v2 v2.2.7
 )
