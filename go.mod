@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/asaskevich/govalidator v0.0.0-20180315120708-ccb8e960c48f
 	github.com/dlclark/regexp2 v1.2.0 // indirect
-	github.com/dop251/goja v0.0.0-20200309191912-043cf4f34a48
+	github.com/dop251/goja v0.0.0-20200414142002-77e84ffb8c65
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/integration-system/isp-event-lib v1.3.0
 	github.com/integration-system/isp-lib/v2 v2.2.0

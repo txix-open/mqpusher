@@ -200,7 +200,9 @@ func main() {
 				return
 			}
 		}
-
+		if row == nil {
+			return
+		}
 		err = publish(row)
 		if err != nil {
 			panic(fmt.Errorf("error publishing row: %v", err))
