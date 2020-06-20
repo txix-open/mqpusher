@@ -1,8 +1,10 @@
-package main
+package source
 
 import (
 	"bufio"
 	"fmt"
+	"github.com/integration-system/mqpusher/conf"
+	"github.com/integration-system/mqpusher/util"
 	"sync/atomic"
 )
 
@@ -11,8 +13,8 @@ const (
 )
 
 type JsonDataSource struct {
-	cfg           JsonSource
-	readerCounter *ReaderCounter
+	cfg           conf.JsonSource
+	readerCounter *util.ReaderCounter
 	scanner       *bufio.Scanner
 	closeReaders  func() error
 	fileSize      int64
@@ -48,8 +50,8 @@ func (s *JsonDataSource) Close() error {
 	return s.closeReaders()
 }
 
-func NewJsonDataSource(cfg JsonSource) (DataSource, error) {
-	fileInfo, reader, readerCounter, closeReaders, err := makeReaders(cfg.Filename)
+func NewJsonDataSource(cfg conf.JsonSource) (DataSource, error) {
+	fileInfo, reader, readerCounter, closeReaders, err := util.MakeReaders(cfg.Filename)
 	if err != nil {
 		return nil, err
 	}

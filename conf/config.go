@@ -1,8 +1,9 @@
-package main
+package conf
 
 import (
 	"github.com/integration-system/isp-event-lib/mq"
 	"github.com/integration-system/isp-lib/v2/structure"
+	"time"
 )
 
 type (
@@ -16,6 +17,7 @@ type (
 		Csv  *CsvSource
 		Json *JsonSource
 		DB   *DBSource
+		Mq   *MqSource
 	}
 	CsvSource struct {
 		Filename string `valid:"required~Required"`
@@ -29,6 +31,11 @@ type (
 		Cursor             bool
 		Parallel           int
 		ConcurrentDBSource *ConcurrentDBSource `yaml:"concurrent"`
+	}
+	MqSource struct {
+		Rabbit       structure.RabbitConfig `valid:"required~Required"`
+		Consumer     mq.CommonConsumerCfg
+		CloseTimeout time.Duration
 	}
 
 	ConcurrentDBSource struct {

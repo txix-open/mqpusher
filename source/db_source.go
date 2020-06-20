@@ -1,8 +1,9 @@
-package main
+package source
 
 import (
 	"context"
 	"fmt"
+	"github.com/integration-system/mqpusher/conf"
 	"sync"
 	"sync/atomic"
 
@@ -29,7 +30,7 @@ $$;
 const countRowsQuery = "SELECT * from __table;"
 
 type DbDataSource struct {
-	cfg           DBSource
+	cfg           conf.DBSource
 	errCh         chan error
 	rowsCh        chan map[string]interface{}
 	ctx           context.Context
@@ -233,7 +234,7 @@ func (s *DbDataSource) startFetching() {
 	close(s.rowsCh)
 }
 
-func NewDbDataSource(cfg DBSource) (DataSource, error) {
+func NewDbDataSource(cfg conf.DBSource) (DataSource, error) {
 	db, err := pgxpool.Connect(context.Background(), sqlConnString(cfg.Database))
 	if err != nil {
 		return nil, err

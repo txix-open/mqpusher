@@ -1,14 +1,16 @@
-package main
+package source
 
 import (
 	"encoding/csv"
+	"github.com/integration-system/mqpusher/conf"
+	"github.com/integration-system/mqpusher/util"
 	"io"
 	"sync/atomic"
 )
 
 type CsvDataSource struct {
-	cfg           CsvSource
-	readerCounter *ReaderCounter
+	cfg           conf.CsvSource
+	readerCounter *util.ReaderCounter
 	csvReader     *csv.Reader
 	closeReaders  func() error
 	columns       []string
@@ -42,8 +44,8 @@ func (s *CsvDataSource) Close() error {
 	return s.closeReaders()
 }
 
-func NewCsvDataSource(cfg CsvSource) (DataSource, error) {
-	fileInfo, reader, readerCounter, closeReaders, err := makeReaders(cfg.Filename)
+func NewCsvDataSource(cfg conf.CsvSource) (DataSource, error) {
+	fileInfo, reader, readerCounter, closeReaders, err := util.MakeReaders(cfg.Filename)
 	if err != nil {
 		return nil, err
 	}

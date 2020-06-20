@@ -1,9 +1,10 @@
-package main
+package source
 
 import (
 	"context"
 	"fmt"
 	"github.com/integration-system/isp-lib/v2/atomic"
+	"github.com/integration-system/mqpusher/conf"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
 	"math"
@@ -17,8 +18,8 @@ const (
 )
 
 type ConcurrentDbDataSource struct {
-	cfg           DBSource
-	conCfg        ConcurrentDBSource
+	cfg           conf.DBSource
+	conCfg        conf.ConcurrentDBSource
 	errCh         chan error
 	rowsCh        chan map[string]interface{}
 	db            *pgxpool.Pool
@@ -139,7 +140,7 @@ func (c *ConcurrentDbDataSource) notifyErr(err error) {
 	c.errCh <- err
 }
 
-func NewConcurrentDbDataSource(cfg DBSource, concurrentCfg ConcurrentDBSource) (DataSource, error) {
+func NewConcurrentDbDataSource(cfg conf.DBSource, concurrentCfg conf.ConcurrentDBSource) (DataSource, error) {
 	db, err := pgxpool.Connect(context.Background(), sqlConnString(cfg.Database))
 	if err != nil {
 		return nil, err

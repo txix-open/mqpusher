@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"archive/zip"
@@ -39,7 +39,7 @@ func NewReaderCounter(r BaseReader) *ReaderCounter {
 	}
 }
 
-func makeReaders(path string) (os.FileInfo, io.Reader, *ReaderCounter, func() error, error) {
+func MakeReaders(path string) (os.FileInfo, io.Reader, *ReaderCounter, func() error, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("open file: %v", err)

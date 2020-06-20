@@ -3,6 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/integration-system/mqpusher/conf"
+	"github.com/integration-system/mqpusher/source"
+	jsoniter "github.com/json-iterator/go"
 	"io/ioutil"
 	"os"
 	"runtime/debug"
@@ -13,7 +16,6 @@ import (
 	"github.com/integration-system/isp-event-lib/mq"
 	log "github.com/integration-system/isp-log"
 	"github.com/integration-system/mqpusher/script"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/panjf2000/ants/v2"
 	"github.com/streadway/amqp"
 	"gopkg.in/yaml.v2"
@@ -23,12 +25,6 @@ const (
 	publisherName = "publisher_name"
 )
 
-type DataSource interface {
-	GetData() (interface{}, error)
-	Progress() (int64, float32)
-	Close() error
-}
-
 var (
 	csvFilepath    = ""
 	jsonFilepath   = ""
@@ -36,8 +32,6 @@ var (
 	scriptFilepath = ""
 	logInterval    = 0
 )
-
-var json = jsoniter.ConfigFastest
 
 func main() {
 	debug.SetGCPercent(1500)
@@ -50,7 +44,7 @@ func main() {
 	flag.Parse()
 
 	// Configuration
-	cfg := Config{}
+	cfg := conf.Config{}
 	b, err := ioutil.ReadFile(configFilepath)
 	if err != nil {
 		log.Errorf(0, "reading config: %v", err)
@@ -63,13 +57,13 @@ func main() {
 	}
 
 	if csvFilepath != "" {
-		cfg.Source.Csv = &CsvSource{Filename: csvFilepath}
+		cfg.Source.Csv = &conf.CsvSource{Filename: csvFilepath}
 	}
 	if jsonFilepath != "" {
-		cfg.Source.Json = &JsonSource{Filename: jsonFilepath}
+		cfg.Source.Json = &conf.JsonSource{Filename: jsonFilepath}
 	}
 	if scriptFilepath != "" {
-		cfg.Script = Script{Filename: scriptFilepath}
+		cfg.Script = conf.Script{Filename: scriptFilepath}
 	}
 
 	_, err = govalidator.ValidateStruct(cfg)
@@ -95,7 +89,7 @@ func main() {
 		return
 	}
 	publish := func(v interface{}) error {
-		body, err := json.Marshal(v)
+		body, err := jsoniter.ConfigFastest.Marshal(v)
 		if err != nil {
 			return err
 		}
@@ -131,12 +125,12 @@ func main() {
 	}
 
 	// Handling
-	var source DataSource
+	var ds source.DataSource
 	defer func() {
-		if source == nil {
+		if ds == nil {
 			return
 		}
-		err := source.Close()
+		err := ds.Close()
 		if err != nil {
 			log.Errorf(0, "closing source: %v", err)
 		}
@@ -144,27 +138,29 @@ func main() {
 
 	switch {
 	case cfg.Source.Csv != nil:
-		source, err = NewCsvDataSource(*cfg.Source.Csv)
+		ds, err = source.NewCsvDataSource(*cfg.Source.Csv)
 		if err != nil {
 			log.Errorf(0, "creating csv source: %v", err)
 			return
 		}
 	case cfg.Source.Json != nil:
-		source, err = NewJsonDataSource(*cfg.Source.Json)
+		ds, err = source.NewJsonDataSource(*cfg.Source.Json)
 		if err != nil {
 			log.Errorf(0, "creating json source: %v", err)
 			return
 		}
 	case cfg.Source.DB != nil:
 		if cfg.Source.DB.ConcurrentDBSource != nil {
-			source, err = NewConcurrentDbDataSource(*cfg.Source.DB, *cfg.Source.DB.ConcurrentDBSource)
+			ds, err = source.NewConcurrentDbDataSource(*cfg.Source.DB, *cfg.Source.DB.ConcurrentDBSource)
 		} else {
-			source, err = NewDbDataSource(*cfg.Source.DB)
+			ds, err = source.NewDbDataSource(*cfg.Source.DB)
 		}
 		if err != nil {
 			log.Errorf(0, "creating db source: %v", err)
 			return
 		}
+	case cfg.Source.Mq != nil:
+		ds = source.NewMqSource(*cfg.Source.Mq)
 	default:
 		log.Error(0, "no source specified")
 		return
@@ -175,7 +171,7 @@ func main() {
 		if err := recover(); err != nil {
 			log.Error(0, err)
 		}
-		totalCount, _ := source.Progress()
+		totalCount, _ := ds.Progress()
 		log.Infof(0, "total processed rows %d, elapsed time: %s", totalCount, time.Since(started).String())
 	}()
 
@@ -184,7 +180,7 @@ func main() {
 			printProgressInterval := time.Duration(logInterval) * time.Second
 			var count int64
 			for range time.NewTicker(printProgressInterval).C {
-				newTotal, percent := source.Progress()
+				newTotal, percent := ds.Progress()
 				diff := newTotal - count
 				log.Infof(0, "processed %d rows in %s; approximately %0.2f%% done", diff, printProgressInterval, percent)
 				count = newTotal
@@ -212,7 +208,7 @@ func main() {
 	submit := syncSubmit
 	wg := sync.WaitGroup{}
 	if cfg.Target.Async {
-		p, err := ants.NewPoolWithFunc(batchSize, func(arg interface{}) {
+		p, err := ants.NewPoolWithFunc(4096, func(arg interface{}) {
 			defer wg.Done()
 			syncSubmit(arg)
 		}, ants.WithPreAlloc(true))
@@ -228,8 +224,9 @@ func main() {
 			}
 		}
 	}
+
 	for {
-		row, err := source.GetData()
+		row, err := ds.GetData()
 		if err != nil {
 			log.Errorf(0, "error reading row: %v", err)
 			return
@@ -238,6 +235,7 @@ func main() {
 		}
 		submit(row)
 	}
+
 	wg.Wait()
 	log.Info(0, "successfully finished")
 }
