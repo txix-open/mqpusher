@@ -73,7 +73,10 @@ func NewMqSource(cfg conf.MqSource) DataSource {
 		"consumer": mq.ByOneConsumerCfg{
 			CommonConsumerCfg: cfg.Consumer,
 			Callback: func(delivery mq.Delivery) {
-				defer delivery.Release()
+				defer func() {
+					delivery.Nack(true) //todo temp
+					delivery.Release()
+				}()
 
 				var v interface{}
 				if err := json.Unmarshal(delivery.GetMessage(), &v); err != nil {
