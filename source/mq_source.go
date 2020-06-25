@@ -74,7 +74,6 @@ func NewMqSource(cfg conf.MqSource) DataSource {
 			CommonConsumerCfg: cfg.Consumer,
 			Callback: func(delivery mq.Delivery) {
 				defer func() {
-					delivery.Nack(true) //todo temp
 					delivery.Release()
 				}()
 
