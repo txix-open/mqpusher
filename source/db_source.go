@@ -3,9 +3,10 @@ package source
 import (
 	"context"
 	"fmt"
-	"github.com/integration-system/mqpusher/conf"
 	"sync"
 	"sync/atomic"
+
+	"github.com/integration-system/mqpusher/conf"
 
 	"github.com/integration-system/isp-lib/v2/structure"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -60,6 +61,7 @@ func (s *DbDataSource) Progress() (int64, float32) {
 }
 
 func (s *DbDataSource) Close() error {
+	s.cancel()
 	s.db.Close()
 	return nil
 }
@@ -235,7 +237,8 @@ func (s *DbDataSource) startFetching() {
 }
 
 func NewDbDataSource(cfg conf.DBSource) (DataSource, error) {
-	db, err := pgxpool.Connect(context.Background(), sqlConnString(cfg.Database))
+	ctx, cancel := context.WithCancel(context.Background())
+	db, err := pgxpool.Connect(ctx, sqlConnString(cfg.Database))
 	if err != nil {
 		return nil, err
 	}
@@ -245,12 +248,18 @@ func NewDbDataSource(cfg conf.DBSource) (DataSource, error) {
 		return nil, err
 	}
 
+	parallel := 1
+	if cfg.Parallel > 0 {
+		parallel = cfg.Parallel
+	}
 	ds := &DbDataSource{
 		cfg:       cfg,
 		db:        db,
 		totalRows: totalRows,
-		rowsCh:    make(chan map[string]interface{}, 3000), // TODO cap
+		rowsCh:    make(chan map[string]interface{}, batchSize*parallel),
 		errCh:     make(chan error, 1),
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 	go ds.startFetching()
 

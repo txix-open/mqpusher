@@ -1,11 +1,12 @@
 package source
 
 import (
+	"sync"
+	"time"
+
 	"github.com/integration-system/isp-event-lib/mq"
 	"github.com/integration-system/isp-lib/v2/atomic"
 	"github.com/integration-system/mqpusher/conf"
-	"sync"
-	"time"
 )
 
 const (
@@ -74,7 +75,13 @@ func NewMqSource(cfg conf.MqSource) DataSource {
 			CommonConsumerCfg: cfg.Consumer,
 			Callback: func(delivery mq.Delivery) {
 				defer func() {
-					delivery.Release()
+					err := delivery.Release()
+					if err != nil {
+						select {
+						case mqDs.errChan <- err:
+						default:
+						}
+					}
 				}()
 
 				var v interface{}
