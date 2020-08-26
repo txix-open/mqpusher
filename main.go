@@ -3,14 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/integration-system/mqpusher/conf"
-	"github.com/integration-system/mqpusher/source"
-	jsoniter "github.com/json-iterator/go"
 	"io/ioutil"
 	"os"
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/integration-system/mqpusher/conf"
+	"github.com/integration-system/mqpusher/source"
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/integration-system/isp-event-lib/mq"
@@ -169,17 +170,20 @@ func main() {
 	started := time.Now()
 	defer func() {
 		if err := recover(); err != nil {
-			log.Error(0, err)
+			log.Errorf(0, "panic: %v", err)
 		}
 		totalCount, _ := ds.Progress()
 		log.Infof(0, "total processed rows %d, elapsed time: %s", totalCount, time.Since(started).String())
 	}()
 
 	if logInterval > 0 {
+		printProgressInterval := time.Duration(logInterval) * time.Second
+		ticker := time.NewTicker(printProgressInterval)
+		defer ticker.Stop()
+
 		go func() {
-			printProgressInterval := time.Duration(logInterval) * time.Second
 			var count int64
-			for range time.NewTicker(printProgressInterval).C {
+			for range ticker.C {
 				newTotal, percent := ds.Progress()
 				diff := newTotal - count
 				log.Infof(0, "processed %d rows in %s; approximately %0.2f%% done", diff, printProgressInterval, percent)
@@ -188,40 +192,44 @@ func main() {
 		}()
 	}
 
-	syncSubmit := func(row interface{}) {
+	syncSubmit := func(row interface{}) error {
 		if convert != nil {
 			row, err = convert(row)
 			if err != nil {
-				panic(fmt.Errorf("error executing script: %v", err))
-				return
+				return fmt.Errorf("error executing script: %v", err)
 			}
 		}
 		if row == nil {
-			return
+			return nil
 		}
 		err = publish(row)
 		if err != nil {
-			panic(fmt.Errorf("error publishing row: %v", err))
-			return
+			return fmt.Errorf("error publishing row: %v", err)
 		}
+
+		return nil
 	}
 	submit := syncSubmit
 	wg := sync.WaitGroup{}
+	const poolSize = 4096
+	var asyncErrorsCh chan error
 	if cfg.Target.Async {
-		p, err := ants.NewPoolWithFunc(4096, func(arg interface{}) {
+		asyncErrorsCh = make(chan error, poolSize)
+		p, err := ants.NewPoolWithFunc(poolSize, func(arg interface{}) {
 			defer wg.Done()
-			syncSubmit(arg)
+			submitErr := syncSubmit(arg)
+			if submitErr != nil {
+				asyncErrorsCh <- submitErr
+			}
 		}, ants.WithPreAlloc(true))
 		if err != nil {
 			panic(err)
 		}
 		defer p.Release()
 
-		submit = func(row interface{}) {
+		submit = func(row interface{}) error {
 			wg.Add(1)
-			if err := p.Invoke(row); err != nil {
-				panic(err)
-			}
+			return p.Invoke(row)
 		}
 	}
 
@@ -233,7 +241,20 @@ func main() {
 		} else if row == nil {
 			break
 		}
-		submit(row)
+		err = submit(row)
+		if err != nil {
+			log.Errorf(0, "error submitting row: %v", err)
+			return
+		}
+
+		select {
+		case err := <-asyncErrorsCh:
+			if err != nil {
+				log.Errorf(0, "error submitting row: %v", err)
+				return
+			}
+		default:
+		}
 	}
 
 	wg.Wait()
