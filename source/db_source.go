@@ -3,9 +3,10 @@ package source
 import (
 	"context"
 	"fmt"
-	"github.com/integration-system/mqpusher/conf"
 	"sync"
 	"sync/atomic"
+
+	"github.com/integration-system/mqpusher/conf"
 
 	"github.com/integration-system/isp-lib/v2/structure"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -60,70 +61,9 @@ func (s *DbDataSource) Progress() (int64, float32) {
 }
 
 func (s *DbDataSource) Close() error {
+	s.cancel()
 	s.db.Close()
 	return nil
-}
-
-func (s *DbDataSource) fetchData() {
-	err := func() (err error) {
-		conn, err := s.db.Acquire(s.ctx)
-		if err != nil {
-			return err
-		}
-		defer conn.Release()
-		RegisterTypes(conn.Conn().ConnInfo())
-
-		tx, err := conn.Begin(s.ctx)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err != nil {
-				_ = tx.Rollback(s.ctx)
-			} else {
-				_ = tx.Commit(s.ctx)
-			}
-		}()
-
-		rows, err := tx.Query(s.ctx, s.cfg.Query)
-		if err != nil {
-			return err
-		}
-
-		var columns []string
-		for rows.Next() {
-			vals, err := rows.Values()
-			if columns == nil {
-				fieldDescriptions := rows.FieldDescriptions()
-				columns = make([]string, len(fieldDescriptions))
-				for i := range fieldDescriptions {
-					columns[i] = string(fieldDescriptions[i].Name)
-				}
-			}
-
-			if err != nil {
-				return err
-			}
-			row := make(map[string]interface{}, len(vals))
-			for i := range columns {
-				row[columns[i]] = vals[i]
-			}
-
-			s.rowsCh <- row
-		}
-
-		err = rows.Err()
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}()
-
-	if err != nil {
-		s.errCh <- err
-	}
-	close(s.rowsCh)
 }
 
 func (s *DbDataSource) fetchDataCursor(total, number int) {
@@ -209,33 +149,27 @@ func (s *DbDataSource) fetchDataCursor(total, number int) {
 	}
 }
 
-func (s *DbDataSource) startFetching() {
-	s.ctx, s.cancel = context.WithCancel(context.Background())
-	if s.cfg.Parallel <= 1 {
-		if s.cfg.Cursor {
-			s.fetchDataCursor(0, 0)
-			close(s.rowsCh)
-		} else {
-			s.fetchData()
-		}
-
-		return
-	}
-
+func (s *DbDataSource) startFetching(parallel int) {
 	wg := new(sync.WaitGroup)
-	for i := 0; i < s.cfg.Parallel; i++ {
+	for i := 0; i < parallel; i++ {
 		wg.Add(1)
 		go func(number int) {
 			defer wg.Done()
-			s.fetchDataCursor(s.cfg.Parallel, number)
+			s.fetchDataCursor(parallel, number)
 		}(i)
 	}
 	wg.Wait()
 	close(s.rowsCh)
 }
 
-func NewDbDataSource(cfg conf.DBSource) (DataSource, error) {
-	db, err := pgxpool.Connect(context.Background(), sqlConnString(cfg.Database))
+func NewDbDataSource(cfg conf.DBSource) (ds DataSource, err error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		if err != nil {
+			cancel()
+		}
+	}()
+	db, err := pgxpool.Connect(ctx, sqlConnString(cfg.Database))
 	if err != nil {
 		return nil, err
 	}
@@ -245,16 +179,22 @@ func NewDbDataSource(cfg conf.DBSource) (DataSource, error) {
 		return nil, err
 	}
 
-	ds := &DbDataSource{
+	parallel := 1
+	if cfg.Parallel > 0 {
+		parallel = cfg.Parallel
+	}
+	dbDs := &DbDataSource{
 		cfg:       cfg,
 		db:        db,
 		totalRows: totalRows,
-		rowsCh:    make(chan map[string]interface{}, 3000), // TODO cap
+		rowsCh:    make(chan map[string]interface{}, batchSize*parallel),
 		errCh:     make(chan error, 1),
+		ctx:       ctx,
+		cancel:    cancel,
 	}
-	go ds.startFetching()
+	go dbDs.startFetching(parallel)
 
-	return ds, nil
+	return dbDs, nil
 }
 
 func sqlConnString(config structure.DBConfiguration) string {

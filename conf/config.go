@@ -1,9 +1,10 @@
 package conf
 
 import (
+	"time"
+
 	"github.com/integration-system/isp-event-lib/mq"
 	"github.com/integration-system/isp-lib/v2/structure"
-	"time"
 )
 
 type (
@@ -28,7 +29,6 @@ type (
 	DBSource struct {
 		Database           structure.DBConfiguration `valid:"required~Required"`
 		Query              string
-		Cursor             bool
 		Parallel           int
 		ConcurrentDBSource *ConcurrentDBSource `yaml:"concurrent"`
 	}
