@@ -162,8 +162,13 @@ func (s *DbDataSource) startFetching(parallel int) {
 	close(s.rowsCh)
 }
 
-func NewDbDataSource(cfg conf.DBSource) (DataSource, error) {
+func NewDbDataSource(cfg conf.DBSource) (ds DataSource, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		if err != nil {
+			cancel()
+		}
+	}()
 	db, err := pgxpool.Connect(ctx, sqlConnString(cfg.Database))
 	if err != nil {
 		return nil, err
@@ -178,7 +183,7 @@ func NewDbDataSource(cfg conf.DBSource) (DataSource, error) {
 	if cfg.Parallel > 0 {
 		parallel = cfg.Parallel
 	}
-	ds := &DbDataSource{
+	dbDs := &DbDataSource{
 		cfg:       cfg,
 		db:        db,
 		totalRows: totalRows,
@@ -187,9 +192,9 @@ func NewDbDataSource(cfg conf.DBSource) (DataSource, error) {
 		ctx:       ctx,
 		cancel:    cancel,
 	}
-	go ds.startFetching(parallel)
+	go dbDs.startFetching(parallel)
 
-	return ds, nil
+	return dbDs, nil
 }
 
 func sqlConnString(config structure.DBConfiguration) string {
