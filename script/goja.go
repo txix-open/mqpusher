@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	AwaitTime = 200 * time.Millisecond
+	AwaitTime = 1000 * time.Millisecond
 )
 
 var scriptEngine = &Goja{}
