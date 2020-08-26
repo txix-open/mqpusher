@@ -66,68 +66,6 @@ func (s *DbDataSource) Close() error {
 	return nil
 }
 
-func (s *DbDataSource) fetchData() {
-	err := func() (err error) {
-		conn, err := s.db.Acquire(s.ctx)
-		if err != nil {
-			return err
-		}
-		defer conn.Release()
-		RegisterTypes(conn.Conn().ConnInfo())
-
-		tx, err := conn.Begin(s.ctx)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err != nil {
-				_ = tx.Rollback(s.ctx)
-			} else {
-				_ = tx.Commit(s.ctx)
-			}
-		}()
-
-		rows, err := tx.Query(s.ctx, s.cfg.Query)
-		if err != nil {
-			return err
-		}
-
-		var columns []string
-		for rows.Next() {
-			vals, err := rows.Values()
-			if columns == nil {
-				fieldDescriptions := rows.FieldDescriptions()
-				columns = make([]string, len(fieldDescriptions))
-				for i := range fieldDescriptions {
-					columns[i] = string(fieldDescriptions[i].Name)
-				}
-			}
-
-			if err != nil {
-				return err
-			}
-			row := make(map[string]interface{}, len(vals))
-			for i := range columns {
-				row[columns[i]] = vals[i]
-			}
-
-			s.rowsCh <- row
-		}
-
-		err = rows.Err()
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}()
-
-	if err != nil {
-		s.errCh <- err
-	}
-	close(s.rowsCh)
-}
-
 func (s *DbDataSource) fetchDataCursor(total, number int) {
 	err := func() (err error) {
 		conn, err := s.db.Acquire(s.ctx)
@@ -211,25 +149,13 @@ func (s *DbDataSource) fetchDataCursor(total, number int) {
 	}
 }
 
-func (s *DbDataSource) startFetching() {
-	s.ctx, s.cancel = context.WithCancel(context.Background())
-	if s.cfg.Parallel <= 1 {
-		if s.cfg.Cursor {
-			s.fetchDataCursor(0, 0)
-			close(s.rowsCh)
-		} else {
-			s.fetchData()
-		}
-
-		return
-	}
-
+func (s *DbDataSource) startFetching(parallel int) {
 	wg := new(sync.WaitGroup)
-	for i := 0; i < s.cfg.Parallel; i++ {
+	for i := 0; i < parallel; i++ {
 		wg.Add(1)
 		go func(number int) {
 			defer wg.Done()
-			s.fetchDataCursor(s.cfg.Parallel, number)
+			s.fetchDataCursor(parallel, number)
 		}(i)
 	}
 	wg.Wait()
@@ -261,7 +187,7 @@ func NewDbDataSource(cfg conf.DBSource) (DataSource, error) {
 		ctx:       ctx,
 		cancel:    cancel,
 	}
-	go ds.startFetching()
+	go ds.startFetching(parallel)
 
 	return ds, nil
 }
