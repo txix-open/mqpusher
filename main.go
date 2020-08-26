@@ -211,7 +211,7 @@ func main() {
 	}
 	submit := syncSubmit
 	wg := sync.WaitGroup{}
-	const poolSize = 4096
+	const poolSize = 300
 	var asyncErrorsCh chan error
 	if cfg.Target.Async {
 		asyncErrorsCh = make(chan error, poolSize)
