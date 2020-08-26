@@ -4,6 +4,7 @@ There is also option to execute js script on every data row before sending them 
 - csv file - plain or compressed with gzip/zip
 - json file (one json object per line) - plain or compressed with gzip/zip
 - sql queries for the postgresql database
+- rabbitmq queue
 
 The configuration is defined through a configuration file, an example is `conf/config.yml`.
 Only one of the source types must be specified at a time in the configuration.
@@ -15,6 +16,8 @@ Some settings can be overridden via flags:
     csv source file path
 -json_file string
     json source file path
+-log int
+    log interval in seconds (default 30)
 -script string
     script file path
 ```

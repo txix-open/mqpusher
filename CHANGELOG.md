@@ -1,3 +1,6 @@
+## v1.2.3
+* fix an endless loop after error
+* increase script timeout from 200ms to 1000ms
 ## v1.2.0
 * add rabbitmq as data source
 * update dependencies
