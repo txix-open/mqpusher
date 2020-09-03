@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -221,6 +222,7 @@ func EstimateQueryTotalRows(db *pgxpool.Pool, query string) (int64, error) {
 		_ = tx.Commit(ctx)
 	}()
 
+	query = strings.ReplaceAll(query, "'", "''")
 	_, err = tx.Exec(ctx, fmt.Sprintf(countRowsFunc, query))
 	if err != nil {
 		return 0, err

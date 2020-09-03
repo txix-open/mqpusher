@@ -1,3 +1,5 @@
+## v1.2.4
+* add quoting `'` in estimating query
 ## v1.2.3
 * fix an endless loop after error
 * increase script timeout from 200ms to 1000ms
