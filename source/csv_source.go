@@ -2,10 +2,12 @@ package source
 
 import (
 	"encoding/csv"
-	"github.com/integration-system/mqpusher/conf"
-	"github.com/integration-system/mqpusher/util"
 	"io"
 	"sync/atomic"
+
+	"github.com/integration-system/mqpusher/conf"
+	"github.com/integration-system/mqpusher/util"
+	errors "golang.org/x/xerrors"
 )
 
 type CsvDataSource struct {
@@ -50,7 +52,14 @@ func NewCsvDataSource(cfg conf.CsvSource) (DataSource, error) {
 		return nil, err
 	}
 	csvReader := csv.NewReader(reader)
-	csvReader.Comma = ';'
+	switch len(cfg.Comma) {
+	case 0:
+		csvReader.Comma = ';'
+	case 1:
+		csvReader.Comma = rune(cfg.Comma[0])
+	default:
+		return nil, errors.New("invalid comma")
+	}
 
 	csvReader.ReuseRecord = true
 	row, err := csvReader.Read()

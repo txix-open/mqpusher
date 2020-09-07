@@ -22,6 +22,7 @@ source:
 #    closetimeout: 5s # время ожидания после последнего полученного сообщения, после которого консумер закрывается
 #  csv:
 #    filename: "data.csv.gz"
+#    comma: ";"
 target:
   rabbit:
     address:
