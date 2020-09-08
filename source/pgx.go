@@ -2,8 +2,9 @@ package source
 
 import (
 	"database/sql/driver"
+
 	"github.com/jackc/pgtype"
-	errors "golang.org/x/xerrors"
+	"github.com/pkg/errors"
 )
 
 var (

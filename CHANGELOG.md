@@ -1,3 +1,5 @@
+## v1.2.5
+* add setting comma for csv reader
 ## v1.2.4
 * add quoting `'` in estimating query
 ## v1.2.3

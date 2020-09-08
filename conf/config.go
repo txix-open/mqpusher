@@ -22,6 +22,7 @@ type (
 	}
 	CsvSource struct {
 		Filename string `valid:"required~Required"`
+		Comma    string
 	}
 	JsonSource struct {
 		Filename string `valid:"required~Required"`

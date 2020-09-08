@@ -3,13 +3,14 @@ package source
 import (
 	"context"
 	"fmt"
+	"math"
+	"runtime"
+	"sync"
+
 	"github.com/integration-system/isp-lib/v2/atomic"
 	"github.com/integration-system/mqpusher/conf"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/pkg/errors"
-	"math"
-	"runtime"
-	"sync"
 )
 
 const (
