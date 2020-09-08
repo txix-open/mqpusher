@@ -162,8 +162,6 @@ github.com/integration-system/isp-log v1.0.0 h1:9i/2DLgkrP6NQDw371/xm1SBMPJ9sMBl
 github.com/integration-system/isp-log v1.0.0/go.mod h1:omfVcb7djvmc0MYWpRq32D9jxRYhyBL518IcdBL9jKY=
 github.com/integration-system/isp-log v1.1.3 h1:+oLEF5fxaDUUQI4x44FGifEEFAR2ZvXusYGTD7m+87Y=
 github.com/integration-system/isp-log v1.1.3/go.mod h1:VVMr3cHW+RuFurPUSeVz71KUnOGQxogxO5atV9N8ISs=
-github.com/integration-system/isp-log v1.1.4 h1:9+tVNhkY0eJiJd8vgKzYwYBmbm59EGkm6ltCO7bPskM=
-github.com/integration-system/isp-log v1.1.4/go.mod h1:VVMr3cHW+RuFurPUSeVz71KUnOGQxogxO5atV9N8ISs=
 github.com/integration-system/isp-log v1.1.5 h1:YiMx+hV2YyCTfHu5vIjtqSkRtPjr/WY9xvKsvONDVNU=
 github.com/integration-system/isp-log v1.1.5/go.mod h1:VVMr3cHW+RuFurPUSeVz71KUnOGQxogxO5atV9N8ISs=
 github.com/integration-system/jsonschema v1.0.0/go.mod h1:EoqDH7RmC8Epg5EgjboIxDo7Udv3WX2exGqtIVB4hI0=

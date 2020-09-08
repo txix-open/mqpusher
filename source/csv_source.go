@@ -7,7 +7,7 @@ import (
 
 	"github.com/integration-system/mqpusher/conf"
 	"github.com/integration-system/mqpusher/util"
-	errors "golang.org/x/xerrors"
+	"github.com/pkg/errors"
 )
 
 type CsvDataSource struct {
