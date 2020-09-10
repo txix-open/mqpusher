@@ -7,11 +7,15 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/integration-system/mqpusher/conf"
-
 	"github.com/integration-system/isp-lib/v2/structure"
+	"github.com/integration-system/mqpusher/conf"
 	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/pingcap/parser"
+	"github.com/pingcap/parser/ast"
+	"github.com/pingcap/parser/format"
+	"github.com/pingcap/parser/opcode"
+	"github.com/pingcap/parser/test_driver"
 )
 
 const (
@@ -30,6 +34,23 @@ DO $$
 $$;
 `
 const countRowsQuery = "SELECT * from __table;"
+
+var (
+	sqlParser    *parser.Parser
+	modWhereExpr *ast.BinaryOperationExpr
+	parserLock   sync.Mutex
+)
+
+func init() {
+	const query = `SELECT id from something WHERE MOD(id, 200) = 100`
+	sqlParser = parser.New()
+	stmt, err := sqlParser.ParseOneStmt(query, "", "")
+	if err != nil {
+		panic(err)
+	}
+
+	modWhereExpr = stmt.(*ast.SelectStmt).Where.(*ast.BinaryOperationExpr)
+}
 
 type DbDataSource struct {
 	cfg           conf.DBSource
@@ -91,8 +112,10 @@ func (s *DbDataSource) fetchDataCursor(total, number int) {
 		query := s.cfg.Query
 		cursorNameN := fmt.Sprintf("%s_%d", cursorName, number)
 		if total > 1 {
-			// TODO: учитывать структуру query, чтобы не получались невалидные запросы
-			query = fmt.Sprintf("%s WHERE MOD(id, %d) = %d", query, total, number)
+			query, err = AppendIDModClauseToQuery(query, total, number)
+			if err != nil {
+				return err
+			}
 		}
 
 		_, err = tx.Exec(s.ctx, fmt.Sprintf("DECLARE %s CURSOR FOR %s", cursorNameN, query))
@@ -235,4 +258,44 @@ func EstimateQueryTotalRows(db *pgxpool.Pool, query string) (int64, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+func AppendIDModClauseToQuery(query string, idMod, equalsTo int) (string, error) {
+	parserLock.Lock()
+	defer parserLock.Unlock()
+
+	stmt, err := sqlParser.ParseOneStmt(query, "", "")
+	if err != nil {
+		return "", fmt.Errorf("can't parse sql query to append where clause: %v", err)
+	}
+	selectStmt := stmt.(*ast.SelectStmt)
+
+	// 200 from example query
+	modOperand := modWhereExpr.L.(*ast.BinaryOperationExpr).R.(*test_driver.ValueExpr)
+	modOperand.SetInt64(int64(idMod))
+
+	// 100 from example query
+	modResultOperand := modWhereExpr.R.(*test_driver.ValueExpr)
+	modResultOperand.SetInt64(int64(equalsTo))
+
+	if selectStmt.Where == nil {
+		selectStmt.Where = modWhereExpr
+	} else {
+		newWhereClause := &ast.BinaryOperationExpr{
+			Op: opcode.LogicAnd,
+			L:  selectStmt.Where,
+			R:  modWhereExpr,
+		}
+		selectStmt.Where = newWhereClause
+	}
+
+	var sb strings.Builder
+	const formatFlags = format.RestoreStringSingleQuotes | format.RestoreKeyWordUppercase |
+		format.RestoreSpacesAroundBinaryOperation
+	err = selectStmt.Restore(format.NewRestoreCtx(formatFlags, &sb))
+	if err != nil {
+		return "", fmt.Errorf("can't print modified sql query: %v", err)
+	}
+
+	return sb.String(), nil
 }
