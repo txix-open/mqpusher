@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/integration-system/isp-lib/v2/scripts"
 	"github.com/integration-system/mqpusher/conf"
 	"github.com/integration-system/mqpusher/source"
 	jsoniter "github.com/json-iterator/go"
@@ -16,7 +17,6 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/integration-system/isp-event-lib/mq"
 	log "github.com/integration-system/isp-log"
-	"github.com/integration-system/mqpusher/script"
 	"github.com/panjf2000/ants/v2"
 	"github.com/streadway/amqp"
 	"gopkg.in/yaml.v2"
@@ -111,13 +111,14 @@ func main() {
 			log.Errorf(0, "reading script: %v", err)
 			return
 		}
-		scr, err := script.Create(b)
+		scr, err := scripts.NewScript(b)
 		if err != nil {
 			log.Errorf(0, "parsing script: %v", err)
 			return
 		}
+		scriptEngine := scripts.NewEngine()
 		convert = func(data interface{}) (interface{}, error) {
-			val, err := script.Default().Execute(scr, data)
+			val, err := scriptEngine.Execute(scr, data)
 			if err != nil {
 				return nil, err
 			}
