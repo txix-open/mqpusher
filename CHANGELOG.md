@@ -1,3 +1,5 @@
+## v1.3.0
+* migrate from inbuilt wrapping of goja to new isp-lib/scripts package
 ## v1.2.6
 * fix db source with parallel enabled and where clause in query
 ## v1.2.5
