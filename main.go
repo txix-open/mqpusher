@@ -118,7 +118,14 @@ func main() {
 		}
 		scriptEngine := scripts.NewEngine()
 		convert = func(data interface{}) (interface{}, error) {
-			val, err := scriptEngine.Execute(scr, data)
+			val, err := scriptEngine.Execute(scr, data,
+				scripts.WithFieldNameMapper(jsonFieldNameMapper{}),
+				scripts.WithSet("sha256", Sha256),
+				scripts.WithSet("sha512", Sha512),
+				scripts.WithSet("time", map[string]interface{}{
+					"format": FormatDate,
+					"parse":  ParseDate,
+				}))
 			if err != nil {
 				return nil, err
 			}

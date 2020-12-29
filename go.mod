@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/asaskevich/govalidator v0.0.0-20180315120708-ccb8e960c48f
 	github.com/integration-system/isp-event-lib v1.5.0
-	github.com/integration-system/isp-lib/v2 v2.7.1-0.20201228144915-e38e9480a3ca
+	github.com/integration-system/isp-lib/v2 v2.8.1
 	github.com/integration-system/isp-log v1.1.6
 	github.com/jackc/pgtype v1.4.2
 	github.com/jackc/pgx/v4 v4.8.1
