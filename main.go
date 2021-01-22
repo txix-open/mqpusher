@@ -111,7 +111,7 @@ func main() {
 			log.Errorf(0, "reading script: %v", err)
 			return
 		}
-		scr, err := scripts.NewScript(b)
+		scr, err := scripts.NewScript([]byte("(function() {\n"), b, []byte("\n})();"))
 		if err != nil {
 			log.Errorf(0, "parsing script: %v", err)
 			return
