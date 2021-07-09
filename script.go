@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func Sha256(value string) string {
@@ -21,6 +23,10 @@ func Sha512(value string) string {
 	_, _ = hash.Write([]byte(strings.ToLower(value)))
 	bytes := hash.Sum(nil)
 	return fmt.Sprintf("%x", bytes)
+}
+
+func UUIDv4() string {
+	return uuid.NewString()
 }
 
 func FormatDate(t time.Time, format string) string {

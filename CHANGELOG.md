@@ -1,3 +1,5 @@
+## v1.4.0
+* add uuid generation function
 ## v1.3.1
 * fix wrap body of script by `function(){` ... `}`
 ## v1.3.0

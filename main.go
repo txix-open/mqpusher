@@ -122,6 +122,7 @@ func main() {
 				scripts.WithFieldNameMapper(jsonFieldNameMapper{}),
 				scripts.WithSet("sha256", Sha256),
 				scripts.WithSet("sha512", Sha512),
+				scripts.WithSet("generateUUIDv4", UUIDv4),
 				scripts.WithSet("time", map[string]interface{}{
 					"format": FormatDate,
 					"parse":  ParseDate,
