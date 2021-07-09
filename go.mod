@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20180315120708-ccb8e960c48f
+	github.com/google/uuid v1.2.0
 	github.com/integration-system/isp-event-lib v1.5.0
 	github.com/integration-system/isp-lib/v2 v2.8.1
 	github.com/integration-system/isp-log v1.1.6
