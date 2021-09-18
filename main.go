@@ -13,6 +13,7 @@ import (
 	"github.com/integration-system/mqpusher/conf"
 	"github.com/integration-system/mqpusher/source"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/spf13/cast"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/integration-system/isp-event-lib/mq"
@@ -32,6 +33,7 @@ var (
 	configFilepath = ""
 	scriptFilepath = ""
 	logInterval    = 0
+	pushString     = false
 )
 
 func main() {
@@ -40,6 +42,7 @@ func main() {
 	flag.StringVar(&csvFilepath, "csv_file", "", "csv source file path")
 	flag.StringVar(&jsonFilepath, "json_file", "", "json source file path")
 	flag.StringVar(&scriptFilepath, "script", "", "script file path")
+	flag.BoolVar(&pushString, "string", false, "push data as string instead json")
 	flag.IntVar(&logInterval, "log", 30, "log interval in seconds")
 	flag.CommandLine.SetOutput(os.Stdout)
 	flag.Parse()
@@ -90,13 +93,18 @@ func main() {
 		return
 	}
 	publish := func(v interface{}) error {
-		body, err := jsoniter.ConfigFastest.Marshal(v)
+		var err error
+		var body []byte
+		if pushString {
+			body = []byte(cast.ToString(v))
+		} else {
+			body, err = jsoniter.ConfigFastest.Marshal(v)
+		}
 		if err != nil {
 			return err
 		}
 
 		return publisher.Publish(amqp.Publishing{
-			ContentType:  "application/json",
 			Body:         body,
 			DeliveryMode: amqp.Persistent,
 		})
