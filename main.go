@@ -127,6 +127,7 @@ func main() {
 		scriptEngine := scripts.NewEngine()
 		convert = func(data interface{}) (interface{}, error) {
 			val, err := scriptEngine.Execute(scr, data,
+				scripts.WithScriptTimeout(5*time.Second),
 				scripts.WithFieldNameMapper(jsonFieldNameMapper{}),
 				scripts.WithSet("sha256", Sha256),
 				scripts.WithSet("sha512", Sha512),
