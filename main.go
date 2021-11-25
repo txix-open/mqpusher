@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -37,7 +36,6 @@ var (
 )
 
 func main() {
-	debug.SetGCPercent(1500)
 	flag.StringVar(&configFilepath, "config", "/etc/mqpusher/config.yml", "config file path")
 	flag.StringVar(&csvFilepath, "csv_file", "", "csv source file path")
 	flag.StringVar(&jsonFilepath, "json_file", "", "json source file path")

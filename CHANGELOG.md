@@ -1,3 +1,5 @@
+## v1.4.3
+* fix GC
 ## v1.4.1
 * fix script timeout error (upgrade isp-lib)
 ## v1.4.0
