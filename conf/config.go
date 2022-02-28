@@ -34,7 +34,7 @@ type (
 		ConcurrentDBSource *ConcurrentDBSource `yaml:"concurrent"`
 	}
 	MqSource struct {
-		Rabbit       structure.RabbitConfig `valid:"required~Required"`
+		Rabbit       mq.Config `valid:"required~Required"`
 		Consumer     mq.CommonConsumerCfg
 		CloseTimeout time.Duration
 	}
@@ -47,8 +47,8 @@ type (
 	}
 
 	Target struct {
-		Rabbit    structure.RabbitConfig `valid:"required~Required"`
-		Publisher mq.PublisherCfg        `valid:"required~Required"`
+		Rabbit    mq.Config       `valid:"required~Required"`
+		Publisher mq.PublisherCfg `valid:"required~Required"`
 		Async     bool
 	}
 	Script struct {

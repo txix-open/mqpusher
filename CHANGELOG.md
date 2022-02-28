@@ -1,3 +1,5 @@
+## v1.4.4
+* upgrade dependencies
 ## v1.4.3
 * fix GC
 ## v1.4.1
