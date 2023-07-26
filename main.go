@@ -8,16 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/integration-system/isp-lib/v2/scripts"
-	"github.com/integration-system/mqpusher/conf"
-	"github.com/integration-system/mqpusher/source"
-	jsoniter "github.com/json-iterator/go"
-	"github.com/spf13/cast"
-
 	"github.com/asaskevich/govalidator"
 	"github.com/integration-system/isp-event-lib/mq"
 	log "github.com/integration-system/isp-log"
+	"github.com/integration-system/isp-script"
+	"github.com/integration-system/mqpusher/conf"
+	"github.com/integration-system/mqpusher/source"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/panjf2000/ants/v2"
+	"github.com/spf13/cast"
 	"github.com/streadway/amqp"
 	"gopkg.in/yaml.v2"
 )
@@ -125,7 +124,7 @@ func main() {
 		scriptEngine := scripts.NewEngine()
 		convert = func(data interface{}) (interface{}, error) {
 			val, err := scriptEngine.Execute(scr, data,
-				scripts.WithScriptTimeout(5*time.Second),
+				scripts.WithTimeout(5*time.Second),
 				scripts.WithFieldNameMapper(jsonFieldNameMapper{}),
 				scripts.WithSet("sha256", Sha256),
 				scripts.WithSet("sha512", Sha512),
@@ -133,7 +132,9 @@ func main() {
 				scripts.WithSet("time", map[string]interface{}{
 					"format": FormatDate,
 					"parse":  ParseDate,
-				}))
+				}),
+				scripts.WithDefaultToolkit(),
+			)
 			if err != nil {
 				return nil, err
 			}
