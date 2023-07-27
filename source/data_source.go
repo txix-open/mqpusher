@@ -7,7 +7,7 @@ var (
 )
 
 type DataSource interface {
-	GetData() (interface{}, error)
+	GetData() (any, error)
 	Progress() (int64, float32)
 	Close() error
 }

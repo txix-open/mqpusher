@@ -20,7 +20,7 @@ type CsvDataSource struct {
 	processedRows int64
 }
 
-func (s *CsvDataSource) GetData() (interface{}, error) {
+func (s *CsvDataSource) GetData() (any, error) {
 	row, err := s.csvReader.Read()
 	if err == io.EOF {
 		return nil, nil
@@ -28,7 +28,7 @@ func (s *CsvDataSource) GetData() (interface{}, error) {
 		return nil, err
 	}
 
-	data := make(map[string]interface{}, len(s.columns))
+	data := make(map[string]any, len(s.columns))
 	for i := range s.columns {
 		data[s.columns[i]] = row[i]
 	}

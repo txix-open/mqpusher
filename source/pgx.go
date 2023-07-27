@@ -23,7 +23,7 @@ type JSON struct {
 	Status pgtype.Status
 }
 
-func (dst *JSON) Set(src interface{}) error {
+func (dst *JSON) Set(src any) error {
 	if src == nil {
 		*dst = JSON{Status: pgtype.Null}
 		return nil
@@ -64,10 +64,10 @@ func (dst *JSON) Set(src interface{}) error {
 	return nil
 }
 
-func (dst *JSON) Get() interface{} {
+func (dst *JSON) Get() any {
 	switch dst.Status {
 	case pgtype.Present:
-		var i interface{}
+		var i any
 		err := json.Unmarshal(dst.Bytes, &i)
 		if err != nil {
 			return dst
@@ -80,7 +80,7 @@ func (dst *JSON) Get() interface{} {
 	}
 }
 
-func (src *JSON) AssignTo(dst interface{}) error {
+func (src *JSON) AssignTo(dst any) error {
 	switch v := dst.(type) {
 	case *string:
 		if src.Status == pgtype.Present {
@@ -147,7 +147,7 @@ func (src JSON) EncodeBinary(ci *pgtype.ConnInfo, buf []byte) ([]byte, error) {
 }
 
 // Scan implements the database/sql Scanner interface.
-func (dst *JSON) Scan(src interface{}) error {
+func (dst *JSON) Scan(src any) error {
 	if src == nil {
 		*dst = JSON{Status: pgtype.Null}
 		return nil
@@ -202,15 +202,15 @@ func (dst *JSON) UnmarshalJSON(b []byte) error {
 
 type JSONB JSON
 
-func (dst *JSONB) Set(src interface{}) error {
+func (dst *JSONB) Set(src any) error {
 	return (*JSON)(dst).Set(src)
 }
 
-func (dst *JSONB) Get() interface{} {
+func (dst *JSONB) Get() any {
 	return (*JSON)(dst).Get()
 }
 
-func (src *JSONB) AssignTo(dst interface{}) error {
+func (src *JSONB) AssignTo(dst any) error {
 	return (*JSON)(src).AssignTo(dst)
 }
 
@@ -254,7 +254,7 @@ func (src JSONB) EncodeBinary(ci *pgtype.ConnInfo, buf []byte) ([]byte, error) {
 }
 
 // Scan implements the database/sql Scanner interface.
-func (dst *JSONB) Scan(src interface{}) error {
+func (dst *JSONB) Scan(src any) error {
 	return (*JSON)(dst).Scan(src)
 }
 

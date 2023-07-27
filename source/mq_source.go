@@ -16,14 +16,14 @@ const (
 type mqDataSource struct {
 	cli            *mq.RabbitMqClient
 	consumeTimeout time.Duration
-	dataChan       chan interface{}
+	dataChan       chan any
 	errChan        chan error
 	closed         bool
 	consumed       *atomic.AtomicInt
 	lock           sync.RWMutex
 }
 
-func (m *mqDataSource) GetData() (interface{}, error) {
+func (m *mqDataSource) GetData() (any, error) {
 	select {
 	case v, ok := <-m.dataChan:
 		if !ok {
@@ -36,7 +36,7 @@ func (m *mqDataSource) GetData() (interface{}, error) {
 	case <-time.After(m.consumeTimeout):
 		m.lock.Lock()
 		m.closed = true
-		var lastValue interface{}
+		var lastValue any
 		select {
 		case lastValue = <-m.dataChan:
 			m.consumed.IncAndGet()
@@ -66,7 +66,7 @@ func NewMqSource(cfg conf.MqSource) DataSource {
 		cli:            cli,
 		consumeTimeout: cfg.CloseTimeout,
 		closed:         false,
-		dataChan:       make(chan interface{}),
+		dataChan:       make(chan any),
 		errChan:        make(chan error, 1024),
 		consumed:       atomic.NewAtomicInt(0),
 	}
@@ -84,7 +84,7 @@ func NewMqSource(cfg conf.MqSource) DataSource {
 					}
 				}()
 
-				var v interface{}
+				var v any
 				if err := json.Unmarshal(delivery.GetMessage(), &v); err != nil {
 					select {
 					case mqDs.errChan <- err:
