@@ -133,6 +133,7 @@ func main() {
 					"parse":  ParseDate,
 				}),
 				scripts.WithDefaultToolkit(),
+				scripts.WithLogger(scripts.NewStdoutJsonLogger()),
 			)
 			if err != nil {
 				return nil, err
