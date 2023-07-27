@@ -22,13 +22,13 @@ type ConcurrentDbDataSource struct {
 	cfg           conf.DBSource
 	conCfg        conf.ConcurrentDBSource
 	errCh         chan error
-	rowsCh        chan map[string]interface{}
+	rowsCh        chan map[string]any
 	db            *pgxpool.Pool
 	totalRows     int64
 	processedRows *atomic.AtomicInt
 }
 
-func (c *ConcurrentDbDataSource) GetData() (interface{}, error) {
+func (c *ConcurrentDbDataSource) GetData() (any, error) {
 	select {
 	case err := <-c.errCh:
 		return nil, err
@@ -113,7 +113,7 @@ func (c *ConcurrentDbDataSource) startFetching() {
 						errChan <- errors.WithMessage(err, "extract result values")
 						return
 					}
-					row := make(map[string]interface{}, len(values))
+					row := make(map[string]any, len(values))
 					for i := range columns {
 						row[columns[i]] = values[i]
 					}
@@ -163,7 +163,7 @@ func NewConcurrentDbDataSource(cfg conf.DBSource, concurrentCfg conf.ConcurrentD
 		conCfg:        concurrentCfg,
 		db:            db,
 		totalRows:     totalRows,
-		rowsCh:        make(chan map[string]interface{}),
+		rowsCh:        make(chan map[string]any),
 		errCh:         make(chan error),
 		processedRows: atomic.NewAtomicInt(0),
 	}

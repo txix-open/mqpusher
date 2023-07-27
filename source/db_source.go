@@ -55,7 +55,7 @@ func init() {
 type DbDataSource struct {
 	cfg           conf.DBSource
 	errCh         chan error
-	rowsCh        chan map[string]interface{}
+	rowsCh        chan map[string]any
 	ctx           context.Context
 	cancel        func()
 	db            *pgxpool.Pool
@@ -63,7 +63,7 @@ type DbDataSource struct {
 	processedRows int64
 }
 
-func (s *DbDataSource) GetData() (interface{}, error) {
+func (s *DbDataSource) GetData() (any, error) {
 	select {
 	case err := <-s.errCh:
 		s.cancel()
@@ -144,7 +144,7 @@ func (s *DbDataSource) fetchDataCursor(total, number int) {
 				if err != nil {
 					return err
 				}
-				row := make(map[string]interface{}, len(vals))
+				row := make(map[string]any, len(vals))
 				for i := range columns {
 					row[columns[i]] = vals[i]
 				}
@@ -211,7 +211,7 @@ func NewDbDataSource(cfg conf.DBSource) (ds DataSource, err error) {
 		cfg:       cfg,
 		db:        db,
 		totalRows: totalRows,
-		rowsCh:    make(chan map[string]interface{}, batchSize*parallel),
+		rowsCh:    make(chan map[string]any, batchSize*parallel),
 		errCh:     make(chan error, 1),
 		ctx:       ctx,
 		cancel:    cancel,

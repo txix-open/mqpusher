@@ -3,9 +3,10 @@ package source
 import (
 	"bufio"
 	"fmt"
+	"sync/atomic"
+
 	"github.com/integration-system/mqpusher/conf"
 	"github.com/integration-system/mqpusher/util"
-	"sync/atomic"
 )
 
 const (
@@ -21,7 +22,7 @@ type JsonDataSource struct {
 	processedRows int64
 }
 
-func (s *JsonDataSource) GetData() (interface{}, error) {
+func (s *JsonDataSource) GetData() (any, error) {
 	ok := s.scanner.Scan()
 	if !ok {
 		if err := s.scanner.Err(); err != nil {
@@ -31,7 +32,7 @@ func (s *JsonDataSource) GetData() (interface{}, error) {
 		}
 	}
 	b := s.scanner.Bytes()
-	var data interface{}
+	var data any
 	err := json.Unmarshal(b, &data)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshaling row: %v", err)

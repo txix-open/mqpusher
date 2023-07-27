@@ -3,21 +3,19 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/integration-system/isp-lib/v2/scripts"
-	"github.com/integration-system/mqpusher/conf"
-	"github.com/integration-system/mqpusher/source"
-	jsoniter "github.com/json-iterator/go"
-	"github.com/spf13/cast"
-
 	"github.com/asaskevich/govalidator"
 	"github.com/integration-system/isp-event-lib/mq"
 	log "github.com/integration-system/isp-log"
+	"github.com/integration-system/isp-script"
+	"github.com/integration-system/mqpusher/conf"
+	"github.com/integration-system/mqpusher/source"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/panjf2000/ants/v2"
+	"github.com/spf13/cast"
 	"github.com/streadway/amqp"
 	"gopkg.in/yaml.v2"
 )
@@ -47,7 +45,7 @@ func main() {
 
 	// Configuration
 	cfg := conf.Config{}
-	b, err := ioutil.ReadFile(configFilepath)
+	b, err := os.ReadFile(configFilepath)
 	if err != nil {
 		log.Errorf(0, "reading config: %v", err)
 		return
@@ -90,7 +88,7 @@ func main() {
 		log.Errorf(0, "mq publisher is not initialized")
 		return
 	}
-	publish := func(v interface{}) error {
+	publish := func(v any) error {
 		var err error
 		var body []byte
 		if pushString {
@@ -109,10 +107,10 @@ func main() {
 	}
 
 	// Script
-	var convert func(interface{}) (interface{}, error)
+	var convert func(any) (any, error)
 
 	if cfg.Script.Filename != "" {
-		b, err := ioutil.ReadFile(cfg.Script.Filename)
+		b, err := os.ReadFile(cfg.Script.Filename)
 		if err != nil {
 			log.Errorf(0, "reading script: %v", err)
 			return
@@ -123,17 +121,20 @@ func main() {
 			return
 		}
 		scriptEngine := scripts.NewEngine()
-		convert = func(data interface{}) (interface{}, error) {
+		convert = func(data any) (any, error) {
 			val, err := scriptEngine.Execute(scr, data,
-				scripts.WithScriptTimeout(5*time.Second),
+				scripts.WithTimeout(5*time.Second),
 				scripts.WithFieldNameMapper(jsonFieldNameMapper{}),
 				scripts.WithSet("sha256", Sha256),
 				scripts.WithSet("sha512", Sha512),
 				scripts.WithSet("generateUUIDv4", UUIDv4),
-				scripts.WithSet("time", map[string]interface{}{
+				scripts.WithSet("time", map[string]any{
 					"format": FormatDate,
 					"parse":  ParseDate,
-				}))
+				}),
+				scripts.WithDefaultToolkit(),
+				scripts.WithLogger(scripts.NewStdoutJsonLogger()),
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -208,7 +209,7 @@ func main() {
 		}()
 	}
 
-	syncSubmit := func(row interface{}) error {
+	syncSubmit := func(row any) error {
 		if convert != nil {
 			row, err = convert(row)
 			if err != nil {
@@ -231,7 +232,7 @@ func main() {
 	var asyncErrorsCh chan error
 	if cfg.Target.Async {
 		asyncErrorsCh = make(chan error, poolSize)
-		p, err := ants.NewPoolWithFunc(poolSize, func(arg interface{}) {
+		p, err := ants.NewPoolWithFunc(poolSize, func(arg any) {
 			defer wg.Done()
 			submitErr := syncSubmit(arg)
 			if submitErr != nil {
@@ -243,7 +244,7 @@ func main() {
 		}
 		defer p.Release()
 
-		submit = func(row interface{}) error {
+		submit = func(row any) error {
 			wg.Add(1)
 			return p.Invoke(row)
 		}
