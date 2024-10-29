@@ -1,38 +1,28 @@
-source:
-  db:
-    database:
-      address: 127.0.0.1
-      schema: ""
-      database: ""
+dataSources:
+  dataBase:
+    client:
+      host: 127.0.0.1
       port: "5432"
+      database: "postgres"
       username: user
       password: password
-    query: "select * from all"
-    cursor: true
-#  mq:
-#    rabbit:
-#      address:
-#        port: "5672"
-#        ip: 127.0.0.1
-#      user: user
-#      password: password
-#    consumer:
-#      queuename: test
-#      prefetchcount: 64
-#    closetimeout: 5s # время ожидания после последнего полученного сообщения, после которого консумер закрывается
-#  csv:
-#    filename: "data.csv.gz"
-#    comma: ";"
+      schema: ""
+    table: "test"
+    parallel: 10
+    batchSize: 100
+    primaryKey: [ "sso_id" ]
+    whereClause: ""
+    selectedColumns: [ "sso_id", "data" ]
 target:
-  rabbit:
-    address:
-      port: "5672"
-      ip: 127.0.0.1
-    user: user
-    password: password
+  client:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    vhost: /
   publisher:
-    exchangename: test-queue
-    routingkey: test-queue
-  async: true
-#script:
-#  filename: "script.js"
+    exchange: ""
+    routingKey: test
+  rps: 1000
+logLevel: debug
+progressLogInterval: 30s
