@@ -1,57 +1,104 @@
 package conf
 
 import (
+	_ "embed"
+	"os"
+	"path"
 	"time"
 
-	"github.com/integration-system/isp-event-lib/mq"
-	"github.com/integration-system/isp-lib/v2/structure"
+	"github.com/pkg/errors"
+	"github.com/txix-open/isp-kit/config"
+	"github.com/txix-open/isp-kit/dbx"
+	"github.com/txix-open/isp-kit/grmqx"
+	"github.com/txix-open/isp-kit/validator"
 )
 
-type (
-	Config struct {
-		Source Source
-		Target Target
-		Script Script
-	}
+//go:embed config.yml
+var EmbedConfig []byte
 
-	Source struct {
-		Csv  *CsvSource
-		Json *JsonSource
-		DB   *DBSource
-		Mq   *MqSource
-	}
-	CsvSource struct {
-		Filename string `valid:"required~Required"`
-		Comma    string
-	}
-	JsonSource struct {
-		Filename string `valid:"required~Required"`
-	}
-	DBSource struct {
-		Database           structure.DBConfiguration `valid:"required~Required"`
-		Query              string
-		Parallel           int
-		ConcurrentDBSource *ConcurrentDBSource `yaml:"concurrent"`
-	}
-	MqSource struct {
-		Rabbit       mq.Config `valid:"required~Required"`
-		Consumer     mq.CommonConsumerCfg
-		CloseTimeout time.Duration
-	}
+type Config struct {
+	LogLevel            string `validate:"required,oneof=debug info error fatal"`
+	ScriptPath          string
+	DataSources         DataSources
+	Target              Target
+	ProgressLogInterval time.Duration
+	IsPlainTextMode     bool
+}
 
-	ConcurrentDBSource struct {
-		Table    string `valid:"required~Required"`
-		Select   string
-		IdColumn string
-		Where    string
-	}
+type DataSources struct {
+	DataBase *DbDataSource
+	RabbitMq *RabbitMqDataSource
+	Csv      *CsvDataSource
+	Json     *JsonDataSource
+}
 
-	Target struct {
-		Rabbit    mq.Config       `valid:"required~Required"`
-		Publisher mq.PublisherCfg `valid:"required~Required"`
-		Async     bool
+type DbDataSource struct {
+	Client          dbx.Config
+	Table           string   `validate:"required"`
+	Parallel        int      `validate:"required,min=1"`
+	BatchSize       uint64   `validate:"required,min=100"`
+	PrimaryKey      []string `validate:"required,min=1"`
+	SelectedColumns []string
+	WhereClause     string
+}
+
+type RabbitMqDataSource struct {
+	Client         grmqx.Connection
+	Consumer       grmqx.Consumer
+	ConsumeTimeout time.Duration
+}
+
+type CsvDataSource struct {
+	FilePath string `validate:"required"`
+	Sep      string `validate:"required"`
+}
+
+type JsonDataSource struct {
+	FilePath string `validate:"required"`
+}
+
+type Target struct {
+	Client            grmqx.Connection
+	Publisher         grmqx.Publisher
+	Rps               int `validate:"required,min=1"`
+	EnableMessageLogs bool
+	ShouldPublishSync bool
+}
+
+func LoadConfig(isDev bool) (Config, error) {
+	cfgPath, err := getConfigFilePath(isDev)
+	if err != nil {
+		return Config{}, errors.WithMessage(err, "get config file path")
 	}
-	Script struct {
-		Filename string
+	cfgReader, err := config.New(
+		config.WithExtraSource(config.NewYamlConfig(cfgPath)),
+		config.WithValidator(validator.Default),
+	)
+	if err != nil {
+		return Config{}, errors.WithMessage(err, "config new")
 	}
-)
+	cfg := Config{}
+	if err := cfgReader.Read(&cfg); err != nil {
+		return Config{}, errors.WithMessage(err, "config read")
+	}
+	return cfg, nil
+}
+
+func getConfigFilePath(isDev bool) (string, error) {
+	cfgPath := os.Getenv("APP_CONFIG_PATH")
+	if cfgPath != "" {
+		return cfgPath, nil
+	}
+	if isDev {
+		return "./conf/config.yml", nil
+	}
+	return RelativePathFromBin("config.yml")
+}
+
+func RelativePathFromBin(part string) (string, error) {
+	ex, err := os.Executable()
+	if err != nil {
+		return "", errors.WithMessage(err, "get executable path")
+	}
+	return path.Join(path.Dir(ex), part), nil
+}
