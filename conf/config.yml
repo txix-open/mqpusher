@@ -1,0 +1,28 @@
+dataSources:
+  dataBase:
+    client:
+      host: 127.0.0.1
+      port: "5432"
+      database: "postgres"
+      username: user
+      password: password
+      schema: ""
+    table: "test"
+    parallel: 10
+    batchSize: 100
+    primaryKey: [ "sso_id" ]
+    whereClause: ""
+    selectedColumns: [ "sso_id", "data" ]
+target:
+  client:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    vhost: /
+  publisher:
+    exchange: ""
+    routingKey: test
+  rps: 1000
+logLevel: debug
+progressLogInterval: 30s
