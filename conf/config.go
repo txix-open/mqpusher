@@ -17,7 +17,7 @@ import (
 var EmbedConfig []byte
 
 type Config struct {
-	LogLevel            string `validate:"required,oneof=debug info error fatal"`
+	LogLevel            string `validate:"required,oneof=debug info warn error fatal"`
 	ScriptPath          string
 	DataSources         DataSources
 	Target              Target
