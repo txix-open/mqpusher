@@ -1,24 +1,34 @@
 # mqpusher
-The mqpusher tool is designed to transfer data from various sources to a single RabbitMQ queue. 
-There is also option to execute js script on every data row before sending them to the queue. At the moment the following sources are supported:
-- csv file - plain or compressed with gzip/zip
-- json file (one json object per line) - plain or compressed with gzip/zip
-- sql queries for the postgresql database
-- rabbitmq queue
+Инструмент mqpusher предназначен для передачи данных из различных источников в одну очередь RabbitMQ.
+Также есть возможность выполнить скрипт на языке JavaScript для каждой строки данных перед отправкой их в очередь. На данный момент поддерживаются следующие источники:
+- CSV-файл
+- JSON-файл (один объект JSON на строку)
+- множество JSON-файлов (каждый файл — один объект JSON; имя файла — requestId)
+- SQL-запросы для базы данных PostgreSQL
+- очередь RabbitMQ
 
-The configuration is defined through a configuration file, an example is `conf/config.yml`.
-Only one of the source types must be specified at a time in the configuration.
-Some settings can be overridden via flags:
-```
--config string
-    config file path (default "/etc/mqpusher/config.yml")
--csv_file string
-    csv source file path
--json_file string
-    json source file path
--log int
-    log interval in seconds (default 30)
--script string
-    script file path
+Настройка утилиты задается через файл конфигурации, например `conf/config.yml`. В конфигурации должен быть указан только один из типов источника за раз.
+Чтобы сгенерировать файл конфигурации рядом с исполняемым файлом утилиты mqpusher, необходимо выполнить следующую команду:
+```shell
+mqpusher generate-config
+# Для этой команды также доступны следующие алиасы: gen-cfg, generate-cfg, gen-config
 ```
 
+Для запуска утилиты mqpusher в режиме публикации данных в очередь, необходимо выполнить следующую команду:
+```shell
+mqpusher publish [options...]
+```
+Для команды publish доступны следующие опции:
+```
+--source string, -s string      Тип источника данных для публикации (доступные значения: csv, json, db, rmq)
+--filepath string, -f string    Путь до файла выбранного источника данных (используется для csv и json источников)
+--script string                 Путь до файла со скриптом преобразования данных на JavaScript
+--log-interval string           Интервал прогресса логирования (пример: 15s) 
+--sep string                    Переопределение разделителя для csv файла
+--log-msg, -l                   Включить логирование публикуемых в очередь сообщений
+--sync                          Включить синхронную публикацию данных в целевую очередь
+--plain-text                    Включает режим отправки 'plainText': вычитка и отправка данных из источника происходят 'как есть', минуя десериализацию. Данный режим принудительно отключает выполнение скрипта (используется для json и rmq источников).
+```
+### Важно
+- Некоторые настройки конфигурации могут быть переопределены с помощью вышеуказанных опций.
+- Для публикации множества JSON-файлов укажите в опции filepath путь к директории с ними.
