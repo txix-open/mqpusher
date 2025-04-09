@@ -38,7 +38,7 @@ type dataBaseSource struct {
 }
 
 func NewDataBase(ctx context.Context, cfg conf.DbDataSource, logger log.Logger) (dataBaseSource, error) {
-	db := dbrx.New()
+	db := dbrx.New(logger)
 	cfg.Client.MaxOpenConn = 64
 	err := db.Upgrade(ctx, cfg.Client)
 	if err != nil {
