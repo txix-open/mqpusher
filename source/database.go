@@ -91,6 +91,7 @@ func NewDataBase(ctx context.Context, cfg conf.DbDataSource, logger log.Logger) 
 	if err != nil {
 		return dataBaseSource{}, errors.WithMessage(err, "select view rows count")
 	}
+	logger.Info(ctx, fmt.Sprintf("rows count of %s: %d", viewName, int(dataSource.rowsCount)))
 
 	go dataSource.startFetchingData(ctx)
 
