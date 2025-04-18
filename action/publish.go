@@ -71,11 +71,12 @@ func (p publishAction) Do(ctx context.Context, shouldPublishSync bool) error {
 }
 
 const (
-	readLogField        = "read"
-	doneReadingLogField = "done reading"
-	publishedLogField   = "published"
-	intervalLogField    = "interval"
-	mpsLogField         = "mps"
+	readLogField           = "read"
+	doneReadingLogField    = "doneReading"
+	publishedLogField      = "published"
+	totalPublishedLogField = "totalPublished"
+	intervalLogField       = "interval"
+	mpsLogField            = "mps"
 )
 
 func (p publishAction) logProgress(ctx context.Context, done <-chan struct{}) {
@@ -104,7 +105,8 @@ func (p publishAction) logProgress(ctx context.Context, done <-chan struct{}) {
 			log.String(intervalLogField, p.logInterval.String()),
 			log.Any(readLogField, progress.ReadDataCount-readDataCount),
 			log.Any(publishedLogField, publishedDelta),
-			log.Any(mpsLogField, float64(publishedDelta)/p.logInterval.Seconds()),
+			log.Any(totalPublishedLogField, newPublishedDataCount),
+			log.Any(mpsLogField, publishedDelta/uint64(p.logInterval.Seconds())),
 		}
 		if progress.ReadDataPercent != nil {
 			logFields = append(logFields, log.String(doneReadingLogField, fmt.Sprintf("%0.2f%%", *progress.ReadDataPercent)))

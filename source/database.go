@@ -38,7 +38,7 @@ type dataBaseSource struct {
 }
 
 func NewDataBase(ctx context.Context, cfg conf.DbDataSource, logger log.Logger) (dataBaseSource, error) {
-	db := dbrx.New()
+	db := dbrx.New(logger)
 	cfg.Client.MaxOpenConn = 64
 	err := db.Upgrade(ctx, cfg.Client)
 	if err != nil {
@@ -91,6 +91,7 @@ func NewDataBase(ctx context.Context, cfg conf.DbDataSource, logger log.Logger) 
 	if err != nil {
 		return dataBaseSource{}, errors.WithMessage(err, "select view rows count")
 	}
+	logger.Info(ctx, fmt.Sprintf("rows count of %s: %d", viewName, int(dataSource.rowsCount)))
 
 	go dataSource.startFetchingData(ctx)
 
