@@ -28,7 +28,7 @@ type publisher struct {
 func NewPublisher(ctx context.Context, cfg conf.Target, logger log.Logger) (publisher, error) {
 	var rmqPub *publisher2.Publisher
 	if cfg.EnableMessageLogs {
-		rmqPub = cfg.Publisher.DefaultPublisher(grmqx.PublisherLog(logger))
+		rmqPub = cfg.Publisher.DefaultPublisher(grmqx.PublisherLog(logger, true))
 	} else {
 		rmqPub = cfg.Publisher.DefaultPublisher()
 	}

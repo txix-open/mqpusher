@@ -86,7 +86,8 @@ func Publish() *cli.Command {
 }
 
 func publish(ctx context.Context, cmd *cli.Command) error {
-	cfg, err := loadAndUpdateConfig(cmd)
+	sourceType := strings.ToLower(cmd.String(sourceFlag))
+	cfg, err := loadAndUpdateConfig(cmd, sourceType)
 	if err != nil {
 		return errors.WithMessage(err, "load and update config")
 	}
@@ -100,7 +101,6 @@ func publish(ctx context.Context, cmd *cli.Command) error {
 		return errors.WithMessage(err, "new logger")
 	}
 
-	sourceType := strings.ToLower(cmd.String(sourceFlag))
 	dataSource, err := defineDataSource(ctx, sourceType, cfg, logger)
 	if err != nil {
 		return errors.WithMessage(err, "define source")
@@ -191,7 +191,7 @@ func isDir(filepath string) bool {
 	return info.IsDir()
 }
 
-func loadAndUpdateConfig(cmd *cli.Command) (conf.Config, error) {
+func loadAndUpdateConfig(cmd *cli.Command, sourceType string) (conf.Config, error) {
 	isDev := strings.ToLower(os.Getenv("APP_MODE")) == "dev"
 	cfg, err := conf.LoadConfig(isDev)
 	if err != nil {
@@ -207,19 +207,14 @@ func loadAndUpdateConfig(cmd *cli.Command) (conf.Config, error) {
 		shouldPublishSync = cmd.Bool(syncFlag)
 		isPlainTextMode   = cmd.Bool(plainTextFlag)
 	)
-	if sourcePath != "" {
-		if cfg.DataSources.Csv == nil {
-			cfg.DataSources.Csv = new(conf.CsvDataSource)
-		}
-		cfg.DataSources.Csv.FilePath = sourcePath
-		cfg.DataSources.Json = &conf.JsonDataSource{FilePath: sourcePath}
+
+	switch sourceType {
+	case jsonSrc:
+		updateJsonSrcCfg(&cfg.DataSources, sourcePath)
+	case csvSrc:
+		updateCsvSrcCfg(&cfg.DataSources, sourcePath, csvSep)
 	}
-	if csvSep != "" {
-		if cfg.DataSources.Csv == nil {
-			cfg.DataSources.Csv = new(conf.CsvDataSource)
-		}
-		cfg.DataSources.Csv.Sep = csvSep
-	}
+
 	if scriptPath != "" {
 		cfg.ScriptPath = scriptPath
 	}
@@ -236,4 +231,26 @@ func loadAndUpdateConfig(cmd *cli.Command) (conf.Config, error) {
 		return conf.Config{}, errors.WithMessage(err, "validate config")
 	}
 	return cfg, nil
+}
+
+func updateJsonSrcCfg(dataSrc *conf.DataSources, srcPath string) {
+	if srcPath != "" {
+		dataSrc.Json = &conf.JsonDataSource{FilePath: srcPath}
+	}
+}
+
+func updateCsvSrcCfg(dataSrc *conf.DataSources, srcPath string, sep string) {
+	if srcPath == "" && sep == "" {
+		return
+	}
+
+	if dataSrc.Csv == nil {
+		dataSrc.Csv = new(conf.CsvDataSource)
+	}
+	if srcPath != "" {
+		dataSrc.Csv.FilePath = srcPath
+	}
+	if sep != "" {
+		dataSrc.Csv.Sep = sep
+	}
 }
