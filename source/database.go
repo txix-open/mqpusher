@@ -285,6 +285,7 @@ func (d dataBaseSource) buildColumnsMap(columns []*sql.ColumnType, values []any,
 			if err != nil {
 				return nil, errors.WithMessagef(err, "handle jsonb type; column = %s", columnName)
 			}
+
 			result[columnName] = v
 			continue
 		}
@@ -306,13 +307,23 @@ func (d dataBaseSource) buildColumnsMap(columns []*sql.ColumnType, values []any,
 	return result, nil
 }
 
-func (d dataBaseSource) handleJsonbType(v any) (map[string]any, error) {
+func (d dataBaseSource) handleJsonbType(v any) (any, error) {
 	bytes, ok := (v).(jsonb.Type)
 	if !ok {
 		return nil, errors.New("cast value to jsonb pointer")
 	}
 
 	var result map[string]any
+	err := json.Unmarshal(bytes, &result)
+	if err != nil {
+		return d.handleArray(bytes)
+	}
+
+	return result, nil
+}
+
+func (d dataBaseSource) handleArray(bytes []byte) (any, error) {
+	result := make([]any, 0)
 	err := json.Unmarshal(bytes, &result)
 	if err != nil {
 		return nil, errors.WithMessage(err, "json unmarshal")
