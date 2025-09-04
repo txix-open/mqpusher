@@ -98,6 +98,32 @@ func NewDataBase(ctx context.Context, cfg conf.DbDataSource, logger log.Logger) 
 	return dataSource, nil
 }
 
+//nolint:mnd
+func (d dataBaseSource) Progress() domain.Progress {
+	readDataCount := d.readCounter.Load()
+	readDataPercent := float64(readDataCount) / d.rowsCount * 100
+	return domain.Progress{
+		ReadDataCount:   readDataCount,
+		ReadDataPercent: &readDataPercent,
+	}
+}
+
+func (d dataBaseSource) Close(ctx context.Context) error {
+	query := fmt.Sprintf("DROP MATERIALIZED VIEW %s CASCADE", viewName)
+	d.logger.Info(ctx, "dropping materialized view", log.String("query", query))
+	_, err := d.db.Exec(ctx, query)
+	if err != nil {
+		d.logger.Error(ctx, errors.WithMessage(err, "drop materialized view"))
+	}
+
+	err = d.db.Close()
+	if err != nil {
+		return errors.WithMessage(err, "close db conn")
+	}
+
+	return nil
+}
+
 func (d dataBaseSource) GetData(_ context.Context) (*domain.Payload, error) {
 	select {
 	case v, ok := <-d.dataChan:
@@ -224,31 +250,6 @@ func (d dataBaseSource) handleRows(ctx context.Context, rows *sql.Rows, handleRo
 	}
 
 	return result, nil
-}
-
-func (d dataBaseSource) Progress() domain.Progress {
-	readDataCount := d.readCounter.Load()
-	readDataPercent := float64(readDataCount) / d.rowsCount * 100
-	return domain.Progress{
-		ReadDataCount:   readDataCount,
-		ReadDataPercent: &readDataPercent,
-	}
-}
-
-func (d dataBaseSource) Close(ctx context.Context) error {
-	query := fmt.Sprintf("DROP MATERIALIZED VIEW %s CASCADE", viewName)
-	d.logger.Info(ctx, "dropping materialized view", log.String("query", query))
-	_, err := d.db.Exec(ctx, query)
-	if err != nil {
-		d.logger.Error(ctx, errors.WithMessage(err, "drop materialized view"))
-	}
-
-	err = d.db.Close()
-	if err != nil {
-		return errors.WithMessage(err, "close db conn")
-	}
-
-	return nil
 }
 
 func (d dataBaseSource) createMaterializedView(ctx context.Context, viewName string, query string) error {

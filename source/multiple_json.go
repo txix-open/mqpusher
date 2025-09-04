@@ -90,6 +90,7 @@ func (m multipleJsonDataSources) GetData(_ context.Context) (*domain.Payload, er
 	return payload, nil
 }
 
+//nolint:mnd
 func (m multipleJsonDataSources) Progress() domain.Progress {
 	readDataPercent := float64(m.readBytesCounter.Load()) / m.filesSize * 100
 	return domain.Progress{
