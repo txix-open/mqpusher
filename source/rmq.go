@@ -15,6 +15,8 @@ import (
 	"github.com/txix-open/mqpusher/domain"
 )
 
+const consumeTimeoutInSec = 5
+
 type rabbitMqDataSource struct {
 	cli      *grmqx.Client
 	logger   log.Logger
@@ -33,7 +35,7 @@ func NewRabbitMq(ctx context.Context, cfg conf.RabbitMqDataSource, logger log.Lo
 		dataChan:        make(chan domain.Payload),
 		errChan:         make(chan error),
 		readCounter:     new(atomic.Uint64),
-		consumeTimeout:  5 * time.Second,
+		consumeTimeout:  consumeTimeoutInSec * time.Second,
 		isPlainTextMode: isPlainTextMode,
 	}
 	if cfg.ConsumeTimeout > 0 {

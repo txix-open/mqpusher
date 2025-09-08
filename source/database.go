@@ -98,6 +98,32 @@ func NewDataBase(ctx context.Context, cfg conf.DbDataSource, logger log.Logger) 
 	return dataSource, nil
 }
 
+//nolint:mnd
+func (d dataBaseSource) Progress() domain.Progress {
+	readDataCount := d.readCounter.Load()
+	readDataPercent := float64(readDataCount) / d.rowsCount * 100
+	return domain.Progress{
+		ReadDataCount:   readDataCount,
+		ReadDataPercent: &readDataPercent,
+	}
+}
+
+func (d dataBaseSource) Close(ctx context.Context) error {
+	query := fmt.Sprintf("DROP MATERIALIZED VIEW %s CASCADE", viewName)
+	d.logger.Info(ctx, "dropping materialized view", log.String("query", query))
+	_, err := d.db.Exec(ctx, query)
+	if err != nil {
+		d.logger.Error(ctx, errors.WithMessage(err, "drop materialized view"))
+	}
+
+	err = d.db.Close()
+	if err != nil {
+		return errors.WithMessage(err, "close db conn")
+	}
+
+	return nil
+}
+
 func (d dataBaseSource) GetData(_ context.Context) (*domain.Payload, error) {
 	select {
 	case v, ok := <-d.dataChan:
@@ -226,31 +252,6 @@ func (d dataBaseSource) handleRows(ctx context.Context, rows *sql.Rows, handleRo
 	return result, nil
 }
 
-func (d dataBaseSource) Progress() domain.Progress {
-	readDataCount := d.readCounter.Load()
-	readDataPercent := float64(readDataCount) / d.rowsCount * 100
-	return domain.Progress{
-		ReadDataCount:   readDataCount,
-		ReadDataPercent: &readDataPercent,
-	}
-}
-
-func (d dataBaseSource) Close(ctx context.Context) error {
-	query := fmt.Sprintf("DROP MATERIALIZED VIEW %s CASCADE", viewName)
-	d.logger.Info(ctx, "dropping materialized view", log.String("query", query))
-	_, err := d.db.Exec(ctx, query)
-	if err != nil {
-		d.logger.Error(ctx, errors.WithMessage(err, "drop materialized view"))
-	}
-
-	err = d.db.Close()
-	if err != nil {
-		return errors.WithMessage(err, "close db conn")
-	}
-
-	return nil
-}
-
 func (d dataBaseSource) createMaterializedView(ctx context.Context, viewName string, query string) error {
 	query = fmt.Sprintf("CREATE MATERIALIZED VIEW %s AS %s", viewName, query)
 	d.logger.Info(ctx, "creating materialized view", log.String("query", query))
@@ -285,6 +286,7 @@ func (d dataBaseSource) buildColumnsMap(columns []*sql.ColumnType, values []any,
 			if err != nil {
 				return nil, errors.WithMessagef(err, "handle jsonb type; column = %s", columnName)
 			}
+
 			result[columnName] = v
 			continue
 		}
@@ -306,13 +308,23 @@ func (d dataBaseSource) buildColumnsMap(columns []*sql.ColumnType, values []any,
 	return result, nil
 }
 
-func (d dataBaseSource) handleJsonbType(v any) (map[string]any, error) {
+func (d dataBaseSource) handleJsonbType(v any) (any, error) {
 	bytes, ok := (v).(jsonb.Type)
 	if !ok {
 		return nil, errors.New("cast value to jsonb pointer")
 	}
 
 	var result map[string]any
+	err := json.Unmarshal(bytes, &result)
+	if err != nil {
+		return d.handleArray(bytes)
+	}
+
+	return result, nil
+}
+
+func (d dataBaseSource) handleArray(bytes []byte) (any, error) {
+	result := make([]any, 0)
 	err := json.Unmarshal(bytes, &result)
 	if err != nil {
 		return nil, errors.WithMessage(err, "json unmarshal")
