@@ -77,6 +77,7 @@ func (j jsonDataSource) GetData(_ context.Context) (*domain.Payload, error) {
 	return payload, nil
 }
 
+//nolint:mnd
 func (j jsonDataSource) Progress() domain.Progress {
 	readDataPercent := float64(j.readBytesCounter.Load()) / j.fileSize * 100
 	return domain.Progress{

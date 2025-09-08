@@ -78,6 +78,7 @@ func (c csvDataSource) GetData(_ context.Context) (*domain.Payload, error) {
 	return &domain.Payload{Data: data}, nil
 }
 
+//nolint:mnd
 func (c csvDataSource) Progress() domain.Progress {
 	readDataPercent := float64(c.readerCounter.Count()) / c.fileSize * 100
 	return domain.Progress{
