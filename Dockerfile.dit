@@ -1,0 +1,23 @@
+ROM dockerhub.mos.ru/mosos/arbat:15.5 as builder
+RUN zypper --no-gpg-checks update -y && zypper --no-gpg-checks install -y go1.24 git
+WORKDIR /build
+ARG version
+ENV version_env=$version
+ARG app_name
+ENV app_name_env=$app_name
+COPY . .
+ENV GOPROXY=https://repo-mirror.mos.ru/repository/go-public
+RUN go build -ldflags="-X 'main.version=$version_env'" -o /main .
+
+FROM dockerhub.mos.ru/mosos/arbat:15.5
+
+RUN zypper --no-gpg-checks update -y && zypper --no-gpg-checks install -y bash-completion jq
+RUN cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime
+RUN echo "Europe/Moscow" > /etc/timezone
+
+ARG app_name
+ENV app_name_env=$app_name
+COPY --from=builder main /usr/bin/$app_name_env
+COPY /conf/config.yml /etc/$app_name_env/config.yml
+
+CMD ["exec $app_name_env"]
