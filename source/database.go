@@ -309,6 +309,10 @@ func (d dataBaseSource) buildColumnsMap(columns []*sql.ColumnType, values []any,
 }
 
 func (d dataBaseSource) handleJsonbType(v any) (any, error) {
+	if v == nil {
+		return nil, nil
+	}
+
 	bytes, ok := (v).(jsonb.Type)
 	if !ok {
 		return nil, errors.New("cast value to jsonb pointer")
