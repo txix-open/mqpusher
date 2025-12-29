@@ -14,6 +14,7 @@ type baseReader interface {
 
 type ReaderCounter struct {
 	baseReader
+
 	count *atomic.Uint64
 }
 
