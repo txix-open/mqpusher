@@ -78,7 +78,8 @@ func LoadConfig(isDev bool) (Config, error) {
 		return Config{}, errors.WithMessage(err, "config new")
 	}
 	cfg := Config{}
-	if err := cfgReader.Read(&cfg); err != nil {
+	err = cfgReader.Read(&cfg)
+	if err != nil {
 		return Config{}, errors.WithMessage(err, "config read")
 	}
 	return cfg, nil
